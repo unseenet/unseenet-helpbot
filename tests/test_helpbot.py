@@ -165,6 +165,9 @@ async def test_end_to_end_on_a_node(tmp_path, monkeypatch):
     runner.cmd_init(cfg)
     st = bot.State.load(cfg.state_file)
     s = runner.open_session(cfg)
+    await runner.publish_profile(s, log=lambda *_: None)
+    assert (await owner.profile_of(s.identity().key_text)).bot
+    assert await runner.bot_keys(owner, {s.identity().key_text}) == {s.identity().key_text}
     cfg.model = FakeModel()
     index = Index.from_folders(cfg.docs)
     quiet = lambda *_: None

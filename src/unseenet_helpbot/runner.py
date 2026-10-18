@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 import os
 import sys
 import tomllib
@@ -26,6 +27,9 @@ from . import bot, llm
 from .docs import Index
 
 PASS_ENV = "UNSEENET_VAULT_PASSPHRASE"
+ABOUT = ("I answer questions in the Unseenet help group from the project's documentation, "
+         "and say where each answer comes from. I can be wrong. Code: "
+         "https://github.com/unseenet/unseenet-helpbot")
 
 
 @dataclass
@@ -106,6 +110,34 @@ async def cmd_ask(cfg: Config, question: str) -> None:
         print(f"{i}. {c.label} - {c.url}")
 
 
+async def bot_keys(s: Session, keys: set[str]) -> set[str]:
+    """The keys among ``keys`` whose profile carries the bot mark (UN-RFC 0022)."""
+    out = set()
+    for k in keys:
+        try:
+            p = await s.profile_of(k)
+        except Exception:                       # no profile, or unreadable: not a bot
+            continue
+        if p is not None and getattr(p, "bot", False):
+            out.add(k)
+    return out
+
+
+async def publish_profile(s: Session, log=print) -> None:
+    """Once per vault: a public profile with the bot mark, so clients show it as a bot."""
+    if s.data.get("helpbot_profile"):
+        return
+    from unseenet.core.profiles import make_profile
+    try:
+        await s.publish_profile(make_profile(about=ABOUT, lang=["en", "da"], bot=True))
+    except (SessionError, OSError, ConnectionError) as exc:
+        log(f"could not publish the profile yet: {exc}")
+        return
+    s.data["helpbot_profile"] = True
+    s.save()
+    log("published the profile with the bot mark")
+
+
 async def look_once(s: Session, cfg: Config, index: Index, state: bot.State,
                     dry_run: bool = False, log=print) -> int:
     """Fetch the group, answer what is due; returns how many answers were posted."""
@@ -118,7 +150,12 @@ async def look_once(s: Session, cfg: Config, index: Index, state: bot.State,
         log(f"first look: {len(msgs)} earlier posts left alone")
         return 0
     me = {s.identity(n).key_text for n in s.data["identities"]}
-    todo = bot.select(msgs, me=me, mine=s.my_message_ids(), rules=cfg.rules, state=state)
+    rules = cfg.rules
+    bots = await bot_keys(s, {m.author_key for m in msgs
+                              if m.message_id not in state.handled and m.author_key not in me})
+    if bots:
+        rules = dataclasses.replace(rules, ignore_keys=rules.ignore_keys | bots)
+    todo = bot.select(msgs, me=me, mine=s.my_message_ids(), rules=rules, state=state)
     posted = 0
     for t in todo:
         q = bot.question_of(t.msg, cfg.rules)
@@ -161,6 +198,8 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     index, built = Index.from_folders(cfg.docs), datetime.now(timezone.utc)
     print(f"{len(index.chunks)} sections of docs; following {cfg.group}")
     try:
+        if not dry_run:
+            await publish_profile(s)
         while True:
             if datetime.now(timezone.utc) - built > timedelta(hours=1):   # docs may have changed
                 index, built = Index.from_folders(cfg.docs), datetime.now(timezone.utc)
