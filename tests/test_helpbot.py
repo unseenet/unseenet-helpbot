@@ -70,6 +70,19 @@ async def test_answer_cites_and_renumbers(tmp_path):
     assert ans.sources[0].heading == "Abstract"      # [2] became [1]
 
 
+def test_looks_english():
+    assert llm.looks_english("Can I use Unseenet in Tails?")
+    assert not llm.looks_english("Hvem står bag Unseenet?")
+    assert not llm.looks_english("Kan jeg køre en node på en Raspberry Pi?")
+
+
+async def test_stray_dont_know_removed(tmp_path):
+    ix = Index.from_folders([write_docs(tmp_path)])
+    ans = await llm.answer(FakeModel("Use the command palette to claim a name. DONT_KNOW [1]"), ix,
+                           "claim a name")
+    assert "DONT_KNOW" not in ans.text and ans.text.startswith("Use the command palette")
+
+
 async def test_dont_know(tmp_path):
     ix = Index.from_folders([write_docs(tmp_path)])
     assert (await llm.answer(FakeModel("DONT_KNOW"), ix, "claim a name")).text == ""

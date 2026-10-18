@@ -72,16 +72,30 @@ class Model:
             None, self._complete, messages, max_tokens)
 
 
+_EN = set("the a is are can how do does what where why which i you to of in it with not and or "
+          "use there my this".split())
+
+
+def looks_english(text: str) -> bool:
+    words = re.findall(r"[a-zæøåäöüé]+", text.lower())
+    if not words or re.search(r"[æøåäöüé]", text.lower()):
+        return False
+    return sum(w in _EN for w in words) / len(words) >= 0.2
+
+
 @dataclass
 class Answer:
     text: str                       # "" when the bot does not know
     sources: list[Chunk]
 
 
-def excerpts(chunks: list[Chunk], limit: int = 1800) -> str:
+def excerpts(chunks: list[Chunk], limit: int = 1200, issue_limit: int = 700) -> str:
+    """The sections the model answers from. Shorter is faster on a small CPU: an
+    issue's title, state and first paragraphs say most of what it is about."""
     out = []
     for i, c in enumerate(chunks, 1):
-        text = c.text if len(c.text) <= limit else c.text[:limit] + " ..."
+        n = issue_limit if c.kind == "issue" else limit
+        text = c.text if len(c.text) <= n else c.text[:n] + " ..."
         out.append(f"[{i}] {c.label}\n{text}")
     return "\n\n".join(out)
 
@@ -91,7 +105,7 @@ async def answer(model: Model, index: Index, question: str, thread: list[str] | 
     """Answer ``question`` from the docs. ``thread``: earlier posts in the
     thread, oldest first, so a follow-up question has its context."""
     query = question
-    if rewrite:
+    if rewrite and not looks_english(question):    # English questions match the docs as they are
         try:
             query += " " + await model.complete(
                 [{"role": "user", "content": KEYWORDS.format(q=question[:1500])}], 40)
@@ -107,6 +121,7 @@ async def answer(model: Model, index: Index, question: str, thread: list[str] | 
               f"Question:\n{question[:3000]}")
     text = await model.complete([{"role": "system", "content": SYSTEM},
                                  {"role": "user", "content": prompt}])
+    text = re.sub(r"\s*\bDONT_KNOW\b\s*", " ", text).strip() if len(text) > 40 else text
     bare = re.sub(r"\[\d+\]|[\s.,;:]", "", text)
     if DONT_KNOW in text[:40].upper().replace("'", "").replace(" ", "_") or len(bare) < 12:
         return Answer("", hits)
