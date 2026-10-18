@@ -1,0 +1,6 @@
+__pycache__/
+*.egg-info/
+bots.toml
+*.key
+state.json
+.venv/
