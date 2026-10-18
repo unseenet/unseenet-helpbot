@@ -10,7 +10,7 @@
 # Running it again updates the bot and keeps the vault, key and state.
 set -euo pipefail
 
-GROUP="${GROUP:?set GROUP to the help group's ID}"
+GROUP="${GROUP:?set GROUP to the ID of the help group}"
 MODEL="${MODEL:-qwen2.5:7b}"
 REPO="${REPO:-https://github.com/unseenet/unseenet-helpbot.git}"
 HOME_DIR=/home/helpbot

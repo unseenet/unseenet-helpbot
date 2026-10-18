@@ -57,6 +57,17 @@ unseenet-helpbot -c helpbot.toml run        # follow the group
 Keep the docs fresh with `git pull` (e.g. a daily timer); the index is
 rebuilt every hour.
 
+On a server, `contrib/install-ubuntu.sh` does all of this - Tor, Ollama,
+the model, a `helpbot` user, a vault with a random passphrase, the bot as a
+systemd service and a daily update of the docs:
+
+```sh
+sudo GROUP="unseenet.help@<fp>" bash contrib/install-ubuntu.sh
+```
+
+The bot publishes a profile with the bot mark (UN-RFC 0022) on its first
+run, and does not answer keys whose profile carries the mark.
+
 ## Choosing a model
 
 Tried on an 8-core laptop CPU without a GPU, with the same three questions:
