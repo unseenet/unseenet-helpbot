@@ -77,6 +77,7 @@ Wants=network-online.target
 [Service]
 User=helpbot
 EnvironmentFile=$ENV_FILE
+Environment=PYTHONUNBUFFERED=1
 ExecStart=$HOME_DIR/.venv/bin/unseenet-helpbot -c $CONFIG run
 Restart=on-failure
 RestartSec=60
