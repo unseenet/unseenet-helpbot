@@ -158,6 +158,13 @@ def test_unanswered_chat_lines():
     assert bot.thread_of(lines[1], lines) == ["Alice: Hi, new here"]
 
 
+def test_question_not_doubled():
+    m = msg("<a>", ALICE, subject="How do I join a group", body="How do I join a group\n")
+    assert bot.question_of(m, bot.Rules()) == "How do I join a group"
+    m = msg("<a>", ALICE, subject="Groups", body="How do I join one?\n")
+    assert bot.question_of(m, bot.Rules()) == "Groups\nHow do I join one?"
+
+
 def test_limits():
     many = [msg(f"<{i}>", ALICE, subject=f"Q{i}") for i in range(5)]
     assert len(pick(many, bot.Rules(max_per_hour=2))) == 2

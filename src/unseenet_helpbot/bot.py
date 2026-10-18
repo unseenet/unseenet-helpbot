@@ -187,7 +187,8 @@ def question_of(msg: Message, rules: Rules) -> str:
     for t in rules.triggers:
         text = re.sub(re.escape(t), "", text, flags=re.IGNORECASE)
     subject = msg.subject.strip()
-    if subject and not subject.lower().startswith("re:"):
+    if subject and not subject.lower().startswith("re:") and \
+            not text.lower().startswith(subject.lower().rstrip("?").strip()):
         text = f"{subject}\n{text}"
     return text.strip()
 
