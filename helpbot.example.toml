@@ -1,0 +1,25 @@
+# Copy to helpbot.toml. The vault's passphrase comes from UNSEENET_VAULT_PASSPHRASE.
+
+[bot]
+vault = "~/.local/share/unseenet-helpbot/helpbot.vault"
+group = "unseenet.help@<owner fingerprint>"
+name = "Unseenet help (bot)"
+# a checkout of unseenet/unseenet; keep it fresh with `git pull` (the index is rebuilt hourly)
+docs = ["~/src/unseenet/docs"]
+state_file = "~/.local/state/unseenet-helpbot/state.json"
+# nodes = ["xyz.onion"]                  # default: Unseenet's list of known nodes
+triggers = ["@helpbot"]                  # answer when a post names the bot like this
+answer_unanswered_after_minutes = 30     # a question nobody answered; 0 = only when asked
+max_per_hour = 10
+max_per_thread = 3
+poll_seconds = 120
+# ignore_keys = ["<key text>"]
+
+[model]
+# any OpenAI-style server: Ollama (default), llama.cpp's llama-server (http://127.0.0.1:8080/v1),
+# or - if you accept that questions then leave Tor - a remote API
+base_url = "http://127.0.0.1:11434/v1"
+model = "qwen2.5:7b"
+rewrite_query = true                     # let the model turn the question into English keywords first
+timeout = 300
+# api_key_env = "HELPBOT_API_KEY"
