@@ -37,7 +37,10 @@ def test_chunks_titles_and_urls(tmp_path):
     d = write_docs(tmp_path)
     chunks = chunk_file(d / "spec" / "un-rfc-0019.md", "spec/un-rfc-0019.md")
     assert chunks[0].title == "Names for Identities"
-    assert [c.label for c in chunks][-1] == "UN-RFC 0019, 4. Registered Names"
+    assert len(chunks) == 1 and chunks[0].label == "UN-RFC 0019"     # short: one piece
+    long = d / "long.md"
+    long.write_text("# Long\n\n" + "".join(f"## Part {i}\n\n" + "word " * 200 + "\n\n" for i in range(5)))
+    assert [c.heading for c in chunk_file(long, "long.md")][-1] == "Part 4"
     assert url_for("spec/un-rfc-0019.md") == "https://unseenet.org/spec/un-rfc-0019/"
     assert url_for("index.md") == "https://unseenet.org/"
     assert url_for("node/index.md") == "https://unseenet.org/node/"
@@ -47,13 +50,13 @@ def test_chunks_titles_and_urls(tmp_path):
 
 def test_search_finds_the_right_section(tmp_path):
     ix = Index.from_folders([write_docs(tmp_path)])
-    assert ix.search("how do I claim a name")[0][1].heading == "4. Registered Names"
+    assert "4. Registered Names" in ix.search("how do I claim a name")[0][1].text
     assert ix.search("raspberry pi port forwarding")[0][1].path == "node/install.md"
     assert ix.search("zzz qqq") == []
 
 
 class FakeModel:
-    def __init__(self, reply="Use the command palette: Claim a name [2]."):
+    def __init__(self, reply="Use the command palette: Claim a name [1]."):
         self.reply, self.calls = reply, []
 
     async def complete(self, messages, max_tokens=500):
@@ -65,9 +68,11 @@ class FakeModel:
 
 async def test_answer_cites_and_renumbers(tmp_path):
     ix = Index.from_folders([write_docs(tmp_path)])
-    ans = await llm.answer(FakeModel(), ix, "Hvordan får jeg et navn?")
-    assert ans.text.endswith("[1].") and len(ans.sources) == 1
-    assert ans.sources[0].heading == "Abstract"      # [2] became [1]
+    ans = await llm.answer(FakeModel("A node runs on a Pi [2]. Names [7]."), ix,
+                           "claim a name, or run a node on a raspberry pi")
+    assert ans.text == "A node runs on a Pi [1]. Names."           # [2] became [1]; [7] dropped
+    second = ix.search("claim a name, or run a node on a raspberry pi")[1][1]
+    assert ans.sources == [second]
 
 
 def test_looks_english():

@@ -129,5 +129,7 @@ async def answer(model: Model, index: Index, question: str, thread: list[str] | 
     used = [hits[n - 1] for n in cited] or hits[:2]
     # number the sources as the list below them is numbered
     renumber = {old: new for new, old in enumerate(cited, 1)}
-    text = re.sub(r"\[(\d+)\]", lambda m: f"[{renumber.get(int(m.group(1)), m.group(1))}]", text)
+    # a citation of an excerpt that was not there is dropped
+    text = re.sub(r"\s?\[(\d+)\]", lambda m: f" [{renumber[int(m.group(1))]}]"
+                  if int(m.group(1)) in renumber else "", text)
     return Answer(text, used)

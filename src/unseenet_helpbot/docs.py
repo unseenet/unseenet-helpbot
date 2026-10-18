@@ -16,6 +16,7 @@ from pathlib import Path
 
 SITE = "https://unseenet.org/"
 MAX_CHARS = 2400          # a section longer than this is split in pieces
+WHOLE = 4000              # a file this short stays one piece: its parts belong together
 SKIP_DIRS = {"assets", "img", "javascripts", "stylesheets"}
 
 _WORD = re.compile(r"[a-z0-9æøå]+(?:[-_.][a-z0-9æøå]+)*", re.IGNORECASE)
@@ -107,6 +108,8 @@ def chunk_text(text: str, rel: str, url: str, repo: str = "") -> list[Chunk]:
             sections.append((m.group(2), [ln]))
         else:
             sections[-1][1].append(ln)
+    if len(text) <= WHOLE:
+        sections = [("", lines)]
     out = []
     for heading, body in sections:
         body_text = "\n".join(body).strip()
