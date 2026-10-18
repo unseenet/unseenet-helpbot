@@ -138,9 +138,24 @@ def test_asked_by_name_or_follow_up():
 def test_never_itself_bots_backlog_or_chat_lines():
     assert pick([msg("<a>", BOT)]) == []
     assert pick([msg("<a>", BOB, name="News (bot)", body="@helpbot\n")]) == []
-    assert pick([msg("<a>", ALICE, kind=KIND_CHAT, subject="")]) == []
+    assert pick([msg("<a>", ALICE, kind=KIND_CHAT, subject="", minutes_ago=5)]) == []   # wait
     assert pick([msg("<a>", ALICE, kind=KIND_CHAT, subject="", body="@helpbot hi?\n")]) \
         == [("<a>", "asked")]
+
+
+def test_unanswered_chat_lines():
+    line = lambda mid, who, ago, body="How do I run a node?\n", name="Alice": msg(
+        mid, who, kind=KIND_CHAT, subject="", minutes_ago=ago, body=body, name=name)
+    assert pick([line("<a>", ALICE, 15)]) == [("<a>", "unanswered")]
+    assert pick([line("<a>", ALICE, 15), line("<b>", BOB, 12, "Easy: install it\n", "Bob")]) == []
+    assert pick([line("<a>", ALICE, 15, "Thanks, that worked\n")]) == []          # not a question
+    assert pick([line("<a>", ALICE, 15, "hvordan laver jeg en gruppe\n")]) == [("<a>", "unanswered")]
+    # the same person over several lines: answer the last one only
+    assert pick([line("<a>", ALICE, 16, "Hi\n"), line("<b>", ALICE, 15)]) == [("<b>", "unanswered")]
+    assert pick([line("<a>", ALICE, 15)], bot.Rules(chat_unanswered_after=None)) == []
+    # the chat before a line is its context
+    lines = [line("<a>", ALICE, 16, "Hi, new here\n"), line("<b>", ALICE, 15)]
+    assert bot.thread_of(lines[1], lines) == ["Alice: Hi, new here"]
 
 
 def test_limits():

@@ -54,6 +54,7 @@ def load_config(path: str | Path) -> Config:
     d = tomllib.loads(path.read_text())
     b, m, g = d.get("bot", {}), d.get("model", {}), d.get("github", {})
     after = b.get("answer_unanswered_after_minutes", 30)
+    chat_after = b.get("answer_unanswered_chat_after_minutes", 10)
     try:
         return Config(
             vault=Path(b["vault"]).expanduser(), group=b["group"],
@@ -63,6 +64,7 @@ def load_config(path: str | Path) -> Config:
             poll=float(b.get("poll_seconds", 120)), rewrite=bool(m.get("rewrite_query", True)),
             rules=bot.Rules(triggers=b.get("triggers", ["@helpbot"]),
                             unanswered_after=timedelta(minutes=after) if after else None,
+                            chat_unanswered_after=timedelta(minutes=chat_after) if chat_after else None,
                             max_per_hour=int(b.get("max_per_hour", 10)),
                             max_per_thread=int(b.get("max_per_thread", 3)),
                             ignore_keys=set(b.get("ignore_keys", []))),

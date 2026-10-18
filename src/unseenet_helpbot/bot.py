@@ -30,6 +30,7 @@ KEEP = 2000                      # handled Message-IDs remembered
 class Rules:
     triggers: list[str] = field(default_factory=lambda: ["@helpbot"])
     unanswered_after: timedelta | None = timedelta(minutes=30)   # None: only when asked
+    chat_unanswered_after: timedelta | None = timedelta(minutes=10)   # chat moves faster
     max_per_hour: int = 10
     max_per_thread: int = 3
     ignore_keys: set[str] = field(default_factory=set)
@@ -77,6 +78,17 @@ def own_text(msg: Message) -> str:
     return "\n".join(ln for ln in body.split("\n") if not ln.lstrip().startswith(">")).strip()
 
 
+_QWORDS = ("how ", "what ", "why ", "where ", "when ", "which ", "who ", "can ", "could ",
+           "is ", "are ", "do ", "does ", "should ", "hvordan ", "hvad ", "hvorfor ", "hvor ",
+           "hvornår ", "hvilken ", "hvilke ", "hvem ", "kan ", "skal ", "er ", "har ", "virker ")
+
+
+def is_question(text: str) -> bool:
+    """A chat line the bot may step in on: it asks something."""
+    t = text.strip().lower()
+    return "?" in t or t.startswith(_QWORDS) or "help" in t or "hjælp" in t
+
+
 def is_bot(msg: Message) -> bool:
     # until profiles carry a bot flag in clients (unseenet/unseenet#163)
     return bool(re.search(r"\(bot\)\s*$|\bbot$", msg.from_name or "", re.IGNORECASE))
@@ -109,6 +121,10 @@ def select(msgs: list[Message], *, me: set[str], mine: set[str], rules: Rules, s
             replied_to.setdefault(r, set()).add(m.author_key)
         if m.author_key in me:
             bot_posts[m.thread_root] = bot_posts.get(m.thread_root, 0) + 1
+    chat = [m for m in msgs if m.kind != KIND_POST and not m.references]
+    later_chat: dict[str, set[str]] = {}       # chat line -> authors who wrote after it
+    for i, m in enumerate(chat):
+        later_chat[m.message_id] = {c.author_key for c in chat[i + 1:]}
     todo = []
     for m in msgs:
         if m.message_id in handled or not m.readable or m.author_key in me:
@@ -125,9 +141,23 @@ def select(msgs: list[Message], *, me: set[str], mine: set[str], rules: Rules, s
         if asked(m, rules, mine):
             todo.append(Todo(m, "asked"))
             continue
+        if m.kind != KIND_POST and not m.references:     # a chat line
+            after = later_chat.get(m.message_id, set())
+            if after & me or after - {m.author_key} or rules.chat_unanswered_after is None:
+                state.done(m.message_id)     # someone (or the bot) wrote after it, or off
+                continue
+            if m.author_key in after:        # the same person goes on: answer the last line
+                state.done(m.message_id)
+                continue
+            if not is_question(own_text(m)):  # "thanks", "hi", an answer to someone
+                state.done(m.message_id)
+                continue
+            if m.date and now - m.date >= rules.chat_unanswered_after:
+                todo.append(Todo(m, "unanswered"))
+            continue
         others = replied_to.get(m.message_id, set()) - {m.author_key}
-        if m.references or others or m.kind != KIND_POST or rules.unanswered_after is None:
-            state.done(m.message_id)     # a reply, answered by a person, a chat line, or off
+        if m.references or others or rules.unanswered_after is None:
+            state.done(m.message_id)     # a reply in a thread, answered by a person, or off
             continue
         if m.date and now - m.date >= rules.unanswered_after:
             todo.append(Todo(m, "unanswered"))
@@ -137,7 +167,12 @@ def select(msgs: list[Message], *, me: set[str], mine: set[str], rules: Rules, s
 
 
 def thread_of(msg: Message, msgs: list[Message]) -> list[str]:
-    """The earlier posts of the thread, oldest first, as plain text."""
+    """The earlier posts of the thread, oldest first, as plain text. For a chat
+    line: the chat just before it (people often ask over several lines)."""
+    if msg.kind != KIND_POST and not msg.references:
+        before = [m for m in msgs if m.kind != KIND_POST and not m.references and m.readable]
+        i = next((n for n, m in enumerate(before) if m.message_id == msg.message_id), 0)
+        return [f"{m.from_name}: {split_signature(m.body)[0].strip()}" for m in before[max(0, i - 6):i]]
     out = []
     for m in msgs:
         if m.message_id == msg.message_id:

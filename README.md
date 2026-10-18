@@ -33,8 +33,10 @@ against a local node and a local model. It does not run on the network yet.
 ## Rules it follows
 
 - **Humans first.** It answers when a post names it (`@helpbot`), when
-  someone replies to one of its answers, or when a question (a new thread)
-  has had no reply for 30 minutes. Chat lines only when it is named.
+  someone replies to one of its answers, when a new thread has had no
+  reply for 30 minutes, or when a chat line that asks something has had no
+  answer for 10 minutes. Dates in Unseenet are rounded to 10 minutes, so
+  the wait can be up to 10 minutes longer.
 - **A source, or no answer:** "I couldn't find this in the docs" when it
   was named, silence otherwise.
 - **No security advice of its own.** The prompt tells it to point to the

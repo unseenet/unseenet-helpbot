@@ -9,7 +9,8 @@ docs = []
 state_file = "~/.local/state/unseenet-helpbot/state.json"
 # nodes = ["xyz.onion"]                  # default: Unseenet's list of known nodes
 triggers = ["@helpbot"]                  # answer when a post names the bot like this
-answer_unanswered_after_minutes = 30     # a question nobody answered; 0 = only when asked
+answer_unanswered_after_minutes = 30     # a new thread nobody answered; 0 = only when asked
+answer_unanswered_chat_after_minutes = 10   # a chat line that asks something, nobody answered
 max_per_hour = 10
 max_per_thread = 3
 poll_seconds = 120

@@ -52,6 +52,7 @@ docs = []
 state_file = "$HOME_DIR/.local/state/unseenet-helpbot/state.json"
 triggers = ["@helpbot"]
 answer_unanswered_after_minutes = 30
+answer_unanswered_chat_after_minutes = 10
 max_per_hour = 10
 max_per_thread = 3
 poll_seconds = 120
