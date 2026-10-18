@@ -124,6 +124,14 @@ def chunks(cache: dict, org: str = "unseenet") -> list[Chunk]:
     for r in cache.get("repos", []):
         name = r["name"]
         tag = f"{name} (archived)" if r.get("archived") else name
+        if r.get("description"):                    # what the repository is, in one line
+            title = f"The {tag} repository"
+            text = (f"{title} (https://github.com/{org}/{name}): {r['description']}"
+                    + (" It is archived: no longer worked on." if r.get("archived") else ""))
+            c = Chunk(f"repo:{name}", title, "", text, f"https://github.com/{org}/{name}",
+                      kind="repo", repo=tag)
+            c.terms = _terms(f"{name} {name} {r['description']} {r['description']}")
+            out.append(c)
         for path, text in r.get("files", {}).items():
             rel = f"{name}/{path}"
             out.extend(chunk_text(text, rel, file_url(org, name, path), repo=tag))

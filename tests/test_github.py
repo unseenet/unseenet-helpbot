@@ -6,7 +6,8 @@ from unseenet_helpbot.docs import Index
 API = {
     "https://api.github.com/orgs/unseenet/repos?type=public&per_page=100&page=1": [
         {"name": "unseenet", "default_branch": "main", "private": False},
-        {"name": "unseenet-web", "default_branch": "main", "private": False},
+        {"name": "unseenet-web", "default_branch": "main", "private": False,
+         "description": "A local web client for Unseenet: groups and chat in a window"},
         {"name": "old", "default_branch": "main", "private": False, "archived": True},
         {"name": "secret", "default_branch": "main", "private": True},
         {"name": "skipme", "default_branch": "main", "private": False}],
@@ -75,6 +76,9 @@ def test_chunks_label_and_link():
     assert rfc.label.startswith("UN-RFC 0005")
     assert rfc.url == "https://unseenet.org/spec/un-rfc-0005/"
     assert ix.search("who is claude")[0][1].url == "https://unseenet.org/project/people/"
+    repo = ix.search("Is there a web client?")[0][1]
+    assert repo.label == "The unseenet-web repository"
+    assert repo.url == "https://github.com/unseenet/unseenet-web"
 
 
 def test_duplicates_dropped_and_issues_capped():

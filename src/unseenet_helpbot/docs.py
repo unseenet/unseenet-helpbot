@@ -22,7 +22,7 @@ _WORD = re.compile(r"[a-z0-9æøå]+(?:[-_.][a-z0-9æøå]+)*", re.IGNORECASE)
 _HEADING = re.compile(r"^(#{1,4})\s+(.+?)\s*#*\s*$")
 _RFC_TITLE = re.compile(r"^\s*Unseenet:\s*(.+?)\s*$")
 _RFC_NUM = re.compile(r"un-rfc-(\d{4})")
-STOP = set("""a an and are as at be by can do does for from has have how i if in is it
+STOP = set("""a an and are as at be by can do does for from has have how i if in is it there
 its my not of on or so that the this to was what when where which who why will with you your
 """.split())
 
@@ -34,14 +34,14 @@ class Chunk:
     heading: str              # the section's heading ("" before the first one)
     text: str
     url: str
-    kind: str = "docs"        # "docs" or "issue" (an issue or a pull request)
+    kind: str = "docs"        # "docs", "issue" (an issue or a pull request) or "repo"
     repo: str = ""            # the repository, for files from GitHub
     terms: Counter = field(default_factory=Counter, repr=False)
 
     @property
     def label(self) -> str:
         """How an answer names this source, e.g. 'UN-RFC 0019, 4. Registered names'."""
-        if self.kind == "issue":
+        if self.kind in ("issue", "repo"):
             return self.title
         m = _RFC_NUM.search(self.path)
         doc = f"UN-RFC {m.group(1)}" if m else self.title
@@ -114,7 +114,7 @@ def chunk_text(text: str, rel: str, url: str, repo: str = "") -> list[Chunk]:
             continue
         for piece in _split(body_text):
             c = Chunk(rel, title, heading, piece, url, repo=repo)
-            c.terms = Counter(tokens(f"{title} {heading} {heading} {piece}"))
+            c.terms = Counter(tokens(f"{repo} {title} {heading} {heading} {piece}"))
             out.append(c)
     return out
 
