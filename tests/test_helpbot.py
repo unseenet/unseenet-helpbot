@@ -41,6 +41,7 @@ def test_chunks_titles_and_urls(tmp_path):
     assert url_for("spec/un-rfc-0019.md") == "https://unseenet.org/spec/un-rfc-0019/"
     assert url_for("index.md") == "https://unseenet.org/"
     assert url_for("node/index.md") == "https://unseenet.org/node/"
+    assert url_for("un-rfc-0005.md") == "https://unseenet.org/spec/un-rfc-0005/"   # from rfc/
     assert "0019" in tokens("see un-rfc-0019")
 
 

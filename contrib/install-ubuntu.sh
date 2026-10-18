@@ -48,7 +48,7 @@ if [ ! -f "$CONFIG" ]; then
 [bot]
 vault = "$HOME_DIR/.config/unseenet-helpbot/helpbot.vault"
 group = "$GROUP"
-docs = ["$HOME_DIR/unseenet/docs"]
+docs = ["$HOME_DIR/unseenet/docs", "$HOME_DIR/unseenet/rfc"]
 state_file = "$HOME_DIR/.local/state/unseenet-helpbot/state.json"
 triggers = ["@helpbot"]
 answer_unanswered_after_minutes = 30

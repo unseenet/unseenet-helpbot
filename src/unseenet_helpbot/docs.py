@@ -56,6 +56,8 @@ def tokens(text: str) -> list[str]:
 
 
 def url_for(rel: str) -> str:
+    if m := _RFC_NUM.search(rel):             # rfc/ in git is spec/ on the site
+        return f"{SITE}spec/un-rfc-{m.group(1)}/"
     rel = rel[:-3] if rel.endswith(".md") else rel
     if rel == "index":
         return SITE
@@ -136,14 +138,18 @@ class Index:
 
     @classmethod
     def from_folders(cls, folders: list[str | Path]) -> "Index":
-        chunks = []
+        chunks, seen = [], set()
         for folder in folders:
             folder = Path(folder).expanduser()
             files = [folder] if folder.is_file() else sorted(folder.rglob("*.md"))
             for f in files:
                 rel = f.name if folder.is_file() else f.relative_to(folder).as_posix()
-                if set(Path(rel).parts) & SKIP_DIRS or f.name == "LICENSE.md":
+                if set(Path(rel).parts) & SKIP_DIRS or f.name in ("LICENSE.md", "README.md"):
                     continue
+                if (m := _RFC_NUM.search(rel)) and m.group(1) in seen:
+                    continue                  # the same UN-RFC in docs/spec and rfc/
+                if m:
+                    seen.add(m.group(1))
                 chunks.extend(chunk_file(f, rel))
         return cls(chunks)
 
