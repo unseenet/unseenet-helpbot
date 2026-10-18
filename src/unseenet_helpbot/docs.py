@@ -34,13 +34,19 @@ class Chunk:
     heading: str              # the section's heading ("" before the first one)
     text: str
     url: str
+    kind: str = "docs"        # "docs" or "issue" (an issue or a pull request)
+    repo: str = ""            # the repository, for files from GitHub
     terms: Counter = field(default_factory=Counter, repr=False)
 
     @property
     def label(self) -> str:
         """How an answer names this source, e.g. 'UN-RFC 0019, 4. Registered names'."""
+        if self.kind == "issue":
+            return self.title
         m = _RFC_NUM.search(self.path)
         doc = f"UN-RFC {m.group(1)}" if m else self.title
+        if self.repo and self.repo != "unseenet" and not m:
+            doc = f"{self.repo}: {doc}"
         return f"{doc}, {self.heading}" if self.heading and self.heading != self.title else doc
 
 
@@ -82,12 +88,15 @@ def _title(lines: list[str], rel: str) -> str:
 
 
 def chunk_file(path: Path, rel: str) -> list[Chunk]:
-    text = path.read_text(encoding="utf-8", errors="replace")
+    return chunk_text(path.read_text(encoding="utf-8", errors="replace"), rel, url_for(rel))
+
+
+def chunk_text(text: str, rel: str, url: str, repo: str = "") -> list[Chunk]:
     # MkDocs key notation: ++ctrl+p++ -> Ctrl+P
     text = re.sub(r"\+\+([a-z0-9+-]+?)\+\+", lambda m: "+".join(
         k.capitalize() if len(k) > 1 else k.upper() for k in m.group(1).split("+")), text)
     lines = text.splitlines()
-    title, url = _title(lines, rel), url_for(rel)
+    title = _title(lines, rel)
     sections: list[tuple[str, list[str]]] = [("", [])]
     in_code = False
     for ln in lines:
@@ -104,7 +113,7 @@ def chunk_file(path: Path, rel: str) -> list[Chunk]:
         if len(body_text) < 40:
             continue
         for piece in _split(body_text):
-            c = Chunk(rel, title, heading, piece, url)
+            c = Chunk(rel, title, heading, piece, url, repo=repo)
             c.terms = Counter(tokens(f"{title} {heading} {heading} {piece}"))
             out.append(c)
     return out
@@ -128,6 +137,13 @@ class Index:
     """BM25 over sections of Markdown files."""
 
     def __init__(self, chunks: list[Chunk], k1: float = 1.4, b: float = 0.75):
+        seen, unique = set(), []
+        for c in chunks:              # the same section from a local folder and from GitHub
+            key = (c.url, c.heading, c.text[:200])
+            if key not in seen:
+                seen.add(key)
+                unique.append(c)
+        chunks = unique
         self.chunks, self.k1, self.b = chunks, k1, b
         self.avg = sum(sum(c.terms.values()) for c in chunks) / max(len(chunks), 1)
         df: Counter = Counter()
@@ -153,7 +169,7 @@ class Index:
                 chunks.extend(chunk_file(f, rel))
         return cls(chunks)
 
-    def search(self, query: str, k: int = 5) -> list[tuple[float, Chunk]]:
+    def search(self, query: str, k: int = 5, max_issues: int = 3) -> list[tuple[float, Chunk]]:
         q = Counter(tokens(query))
         scored = []
         for c in self.chunks:
@@ -170,9 +186,11 @@ class Index:
         out: list[tuple[float, Chunk]] = []
         per_doc: Counter = Counter()
         for s, c in scored:                       # at most two pieces of one document
-            if per_doc[c.path] >= 2:
+            if per_doc[c.path] >= 2 or (c.kind == "issue" and per_doc["#issues"] >= max_issues):
                 continue
             per_doc[c.path] += 1
+            if c.kind == "issue":
+                per_doc["#issues"] += 1
             out.append((s, c))
             if len(out) >= k:
                 break

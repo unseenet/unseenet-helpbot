@@ -13,9 +13,14 @@ against a local node and a local model. It does not run on the network yet.
   on `unseenet.client.session.Session` from
   [unseenet/unseenet](https://github.com/unseenet/unseenet), with its own
   vault and the name *Unseenet help (bot)*.
-- **Knowledge.** At start (and hourly) it cuts the docs and the UN-RFC
-  series into sections and searches them with BM25: no model, no extra
-  package, milliseconds for the whole docs folder.
+- **Knowledge.** Every public repository of the organisation on GitHub:
+  its Markdown files (README, docs, the UN-RFCs, the changelog), and its
+  issues and pull requests with their state, labels and milestone, so it
+  can say "a known problem, open in #140" or "planned for 0.4.0". The list
+  of repositories is read at every sync (every 6 hours), so new ones come
+  by themselves; private ones never. Local folders can be added too. All
+  of it is cut into sections and searched with BM25 - no model, no extra
+  package, milliseconds.
 - **Answering.** The model first turns the question into English search
   keywords (so a Danish question finds the English docs), then answers
   from the five best sections only, citing them. The reply quotes the
@@ -45,21 +50,18 @@ against a local node and a local model. It does not run on the network yet.
 ```sh
 pip install git+https://github.com/unseenet/unseenet-helpbot.git
 ollama pull qwen2.5:7b
-git clone https://github.com/unseenet/unseenet ~/src/unseenet   # the docs
 cp helpbot.example.toml helpbot.toml        # fill in the group
 export UNSEENET_VAULT_PASSPHRASE=...
+unseenet-helpbot -c helpbot.toml sync       # fetch the repositories, issues and PRs
 unseenet-helpbot -c helpbot.toml ask "How do I run a node?"   # try it, no network
 unseenet-helpbot -c helpbot.toml init       # the bot's vault and key
 unseenet-helpbot -c helpbot.toml run --once --dry-run   # what would it answer?
 unseenet-helpbot -c helpbot.toml run        # follow the group
 ```
 
-Keep the docs fresh with `git pull` (e.g. a daily timer); the index is
-rebuilt every hour.
-
 On a server, `contrib/install-ubuntu.sh` does all of this - Tor, Ollama,
-the model, a `helpbot` user, a vault with a random passphrase, the bot as a
-systemd service and a daily update of the docs:
+the model, a `helpbot` user, a vault with a random passphrase and the bot
+as a systemd service:
 
 ```sh
 sudo GROUP="unseenet.help@<fp>" bash contrib/install-ubuntu.sh

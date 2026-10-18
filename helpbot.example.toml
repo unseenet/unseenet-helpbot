@@ -4,9 +4,8 @@
 vault = "~/.local/share/unseenet-helpbot/helpbot.vault"
 group = "unseenet.help@<owner fingerprint>"
 name = "Unseenet help (bot)"
-# a checkout of unseenet/unseenet: the docs, and the UN-RFCs (in rfc/, not docs/spec/, in git);
-# keep it fresh with `git pull` (the index is rebuilt hourly)
-docs = ["~/src/unseenet/docs", "~/src/unseenet/rfc"]
+# local folders of Markdown, on top of what [github] brings (e.g. a checkout you are editing)
+docs = []
 state_file = "~/.local/state/unseenet-helpbot/state.json"
 # nodes = ["xyz.onion"]                  # default: Unseenet's list of known nodes
 triggers = ["@helpbot"]                  # answer when a post names the bot like this
@@ -15,6 +14,16 @@ max_per_hour = 10
 max_per_thread = 3
 poll_seconds = 120
 # ignore_keys = ["<key text>"]
+
+[github]
+# every public repository of the organisation: Markdown files, issues and pull requests.
+# The list of repositories is read at every sync, so new ones come by themselves.
+org = "unseenet"
+refresh_hours = 6
+issues = true
+# exclude = ["some-experiment"]
+# token_env = "HELPBOT_GITHUB_TOKEN"     # only needed past GitHub's 60 requests an hour
+cache_file = "~/.local/state/unseenet-helpbot/github.json"
 
 [model]
 # any OpenAI-style server: Ollama (default), llama.cpp's llama-server (http://127.0.0.1:8080/v1),

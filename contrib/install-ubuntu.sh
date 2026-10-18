@@ -5,8 +5,9 @@
 #   sudo GROUP="unseenet.help@<fp>" bash install-ubuntu.sh
 #
 # It installs Tor and Ollama, pulls the model, makes a user `helpbot` with a
-# venv, a checkout of the docs and a vault with a random passphrase, and
-# starts two systemd units: the bot, and a daily `git pull` of the docs.
+# venv and a vault with a random passphrase, and starts the bot as a systemd
+# service. The bot reads the docs, issues and pull requests of every public
+# repository of the organisation from GitHub itself, every 6 hours.
 # Running it again updates the bot and keeps the vault, key and state.
 set -euo pipefail
 
@@ -30,7 +31,6 @@ id helpbot >/dev/null 2>&1 || useradd -m -s /bin/bash helpbot
 sudo -u helpbot bash -s <<EOF
 set -e
 cd $HOME_DIR
-[ -d unseenet ] && git -C unseenet pull -q || git clone -q https://github.com/unseenet/unseenet.git
 [ -d .venv ] || python3 -m venv .venv
 .venv/bin/pip install -q --upgrade "git+$REPO"
 mkdir -p .config/unseenet-helpbot .local/state/unseenet-helpbot
@@ -48,13 +48,18 @@ if [ ! -f "$CONFIG" ]; then
 [bot]
 vault = "$HOME_DIR/.config/unseenet-helpbot/helpbot.vault"
 group = "$GROUP"
-docs = ["$HOME_DIR/unseenet/docs", "$HOME_DIR/unseenet/rfc"]
+docs = []
 state_file = "$HOME_DIR/.local/state/unseenet-helpbot/state.json"
 triggers = ["@helpbot"]
 answer_unanswered_after_minutes = 30
 max_per_hour = 10
 max_per_thread = 3
 poll_seconds = 120
+
+[github]
+org = "unseenet"
+refresh_hours = 6
+cache_file = "$HOME_DIR/.local/state/unseenet-helpbot/github.json"
 
 [model]
 base_url = "http://127.0.0.1:11434/v1"
@@ -86,31 +91,7 @@ RestartSec=60
 WantedBy=multi-user.target
 EOF
 
-cat > /etc/systemd/system/unseenet-helpbot-docs.service <<EOF
-[Unit]
-Description=Update the docs the Unseenet help bot answers from
-
-[Service]
-Type=oneshot
-User=helpbot
-ExecStart=/usr/bin/git -C $HOME_DIR/unseenet pull -q
-EOF
-
-cat > /etc/systemd/system/unseenet-helpbot-docs.timer <<EOF
-[Unit]
-Description=Update the help bot's docs daily
-
-[Timer]
-OnCalendar=daily
-RandomizedDelaySec=1h
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-EOF
-
 systemctl daemon-reload
-systemctl enable --now unseenet-helpbot-docs.timer
 systemctl enable unseenet-helpbot
 systemctl restart unseenet-helpbot
 echo

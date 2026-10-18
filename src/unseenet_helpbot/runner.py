@@ -23,7 +23,7 @@ from pathlib import Path
 from unseenet.client.session import Session, SessionError
 from unseenet.core.vault import Vault
 
-from . import bot, llm
+from . import bot, github, llm
 from .docs import Index
 
 PASS_ENV = "UNSEENET_VAULT_PASSPHRASE"
@@ -44,17 +44,20 @@ class Config:
     rewrite: bool = True
     rules: bot.Rules = field(default_factory=bot.Rules)
     model: llm.Model = field(default_factory=llm.Model)
+    github: github.GitHub | None = None
+    github_cache: Path = Path("~/.local/state/unseenet-helpbot/github.json").expanduser()
+    github_hours: float = 6.0
 
 
 def load_config(path: str | Path) -> Config:
     path = Path(path).expanduser()
     d = tomllib.loads(path.read_text())
-    b, m = d.get("bot", {}), d.get("model", {})
+    b, m, g = d.get("bot", {}), d.get("model", {}), d.get("github", {})
     after = b.get("answer_unanswered_after_minutes", 30)
     try:
         return Config(
             vault=Path(b["vault"]).expanduser(), group=b["group"],
-            docs=[str(Path(p).expanduser()) for p in b["docs"]],
+            docs=[str(Path(p).expanduser()) for p in b.get("docs", [])],
             state_file=Path(b.get("state_file", "~/.local/state/unseenet-helpbot/state.json")).expanduser(),
             name=b.get("name", "Unseenet help (bot)"), nodes=b.get("nodes", []),
             poll=float(b.get("poll_seconds", 120)), rewrite=bool(m.get("rewrite_query", True)),
@@ -66,7 +69,13 @@ def load_config(path: str | Path) -> Config:
             model=llm.Model(base_url=m.get("base_url", llm.Model.base_url),
                             model=m.get("model", llm.Model.model),
                             api_key=os.environ.get(m.get("api_key_env", ""), "") if m.get("api_key_env") else "",
-                            timeout=float(m.get("timeout", 300))))
+                            timeout=float(m.get("timeout", 300))),
+            github=github.GitHub(org=g.get("org", "unseenet"), issues=bool(g.get("issues", True)),
+                                 exclude=set(g.get("exclude", [])),
+                                 token=os.environ.get(g.get("token_env", ""), "") if g.get("token_env") else "")
+                   if g.get("enabled", True) and g else None,
+            github_cache=Path(g.get("cache_file", "~/.local/state/unseenet-helpbot/github.json")).expanduser(),
+            github_hours=float(g.get("refresh_hours", 6)))
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -96,8 +105,33 @@ def cmd_init(cfg: Config) -> None:
     print(f"follows: {cfg.group} on {', '.join(s.nodes)}")
 
 
+def build_index(cfg: Config) -> Index:
+    """The local folders and, if configured, what was last fetched from GitHub."""
+    chunks = Index.from_folders(cfg.docs).chunks if cfg.docs else []
+    if cfg.github is not None:
+        chunks += github.chunks(github.load_cache(cfg.github_cache), cfg.github.org)
+    return Index(chunks)
+
+
+async def sync_github(cfg: Config, force: bool = False, log=print) -> bool:
+    """Fetch from GitHub if the cache is older than refresh_hours; True if it did."""
+    if cfg.github is None:
+        return False
+    cache = github.load_cache(cfg.github_cache)
+    if not force and datetime.now(timezone.utc).timestamp() - cache.get("synced", 0) < cfg.github_hours * 3600:
+        return False
+    try:
+        fresh = await asyncio.get_running_loop().run_in_executor(None, cfg.github.sync, log)
+    except (OSError, ValueError, KeyError) as exc:
+        log(f"github: could not sync: {exc}")
+        return False
+    if fresh["repos"]:
+        github.save_cache(cfg.github_cache, fresh)
+    return True
+
+
 async def cmd_ask(cfg: Config, question: str) -> None:
-    index = Index.from_folders(cfg.docs)
+    index = build_index(cfg)
     ans = await llm.answer(cfg.model, index, question, rewrite=cfg.rewrite)
     if not ans.text:
         print("(not found in the docs)")
@@ -195,14 +229,16 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     state = bot.State.load(cfg.state_file)
     if dry_run:
         state.path = None                          # look, but remember nothing
-    index, built = Index.from_folders(cfg.docs), datetime.now(timezone.utc)
-    print(f"{len(index.chunks)} sections of docs; following {cfg.group}")
+    await sync_github(cfg)
+    index, built = build_index(cfg), datetime.now(timezone.utc)
+    print(f"{len(index.chunks)} sections of docs, issues and PRs; following {cfg.group}")
     try:
         if not dry_run:
             await publish_profile(s)
         while True:
             if datetime.now(timezone.utc) - built > timedelta(hours=1):   # docs may have changed
-                index, built = Index.from_folders(cfg.docs), datetime.now(timezone.utc)
+                await sync_github(cfg)
+                index, built = build_index(cfg), datetime.now(timezone.utc)
             try:
                 await look_once(s, cfg, index, state, dry_run)
             except (SessionError, OSError, ConnectionError) as exc:
@@ -222,6 +258,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("init", help="make the bot's vault and key, and follow the group")
     a = sub.add_parser("ask", help="answer one question from the docs, without the network")
     a.add_argument("question")
+    sub.add_parser("sync", help="fetch the repositories, issues and PRs from GitHub now")
     r = sub.add_parser("run", help="follow the group and answer")
     r.add_argument("--once", action="store_true", help="look once, then stop")
     r.add_argument("--dry-run", action="store_true", help="show answers instead of posting")
@@ -232,6 +269,9 @@ def main(argv: list[str] | None = None) -> None:
             cmd_init(cfg)
         elif args.cmd == "ask":
             asyncio.run(cmd_ask(cfg, args.question))
+        elif args.cmd == "sync":
+            asyncio.run(sync_github(cfg, force=True))
+            print(f"{len(build_index(cfg).chunks)} sections in all")
         else:
             asyncio.run(cmd_run(cfg, args.once, args.dry_run))
     except KeyboardInterrupt:
