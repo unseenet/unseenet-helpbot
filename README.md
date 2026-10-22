@@ -50,7 +50,7 @@ against a local node and a local model. It does not run on the network yet.
 ## Running it
 
 ```sh
-pip install git+https://github.com/unseenet/unseenet-helpbot.git
+pip install "unseenet-helpbot @ git+https://github.com/unseenet/unseenet-helpbot.git@v0.1.0"
 ollama pull qwen2.5:7b
 cp helpbot.example.toml helpbot.toml        # fill in the group
 export UNSEENET_VAULT_PASSPHRASE=...
@@ -83,6 +83,20 @@ Tried on an 8-core laptop CPU without a GPU, with the same three questions:
 
 `qwen2.5:7b` is the default. An Oracle Always Free ARM VM (4 cores,
 24 GB) can run it; expect it to be slower than the table.
+
+## Versions and releases
+
+Versions follow [semantic versioning](https://semver.org/) on the same
+principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/development.md#versioning):
+tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and a
+GitHub release for each tag. This is one of the project's own services, so it
+is not on PyPI. Each release names the minor version of unseenet it works with
+(`unseenet>=0.4.1,<0.5`).
+
+To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
+new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
+`src/unseenet_helpbot/__init__.py`, commit, then
+`git tag -a vX.Y.Z -m "unseenet-helpbot X.Y.Z" && git push origin vX.Y.Z`.
 
 ## Licence
 
