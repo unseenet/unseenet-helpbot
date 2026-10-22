@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from unseenet.client.runtime import SERVICE_RIPEN_TO, ClientRuntime
 from unseenet.client.session import Session, SessionError
 from unseenet.core.vault import Vault
 
@@ -147,16 +148,13 @@ async def cmd_ask(cfg: Config, question: str) -> None:
 
 
 async def bot_keys(s: Session, keys: set[str]) -> set[str]:
-    """The keys among ``keys`` whose profile carries the bot mark (UN-RFC 0022)."""
-    out = set()
-    for k in keys:
-        try:
-            p = await s.profile_of(k)
-        except Exception:                       # no profile, or unreadable: not a bot
-            continue
-        if p is not None and getattr(p, "bot", False):
-            out.add(k)
-    return out
+    """The keys among ``keys`` whose profile carries the bot mark (UN-RFC 0022), read
+    in one batch so the node does not learn whose profile is looked at (UN-RFC 0041)."""
+    try:
+        await s.prefetch_profiles(keys)
+    except (SessionError, OSError, ConnectionError):
+        pass                                    # what is cached still counts
+    return {k for k in keys if s.is_bot(k)}
 
 
 async def publish_profile(s: Session, log=print) -> None:
@@ -234,9 +232,12 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     await sync_github(cfg)
     index, built = build_index(cfg), datetime.now(timezone.utc)
     print(f"{len(index.chunks)} sections of docs, issues and PRs; following {cfg.group}")
+    ripening = None
     try:
         if not dry_run:
             await publish_profile(s)
+            if not once:            # on to level 3, no surcharge; low priority (UN-RFC 0025)
+                ripening = asyncio.create_task(ClientRuntime(s, ripen_to=SERVICE_RIPEN_TO).ripen())
         while True:
             if datetime.now(timezone.utc) - built > timedelta(hours=1):   # docs may have changed
                 await sync_github(cfg)
@@ -249,6 +250,8 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
                 break
             await asyncio.sleep(cfg.poll)
     finally:
+        if ripening is not None:
+            ripening.cancel()
         await s.close()
 
 
