@@ -7,6 +7,14 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Learning from earlier answered threads** (#5): a question in the help group
+  that someone other than the asker answered - a person, never a bot - becomes
+  a source, with a link to the thread, at most two in an answer. The prompt
+  says to prefer the docs, as an earlier answer may be out of date.
+  `learn_from_threads = false` turns it off.
+
 ## [0.1.0] - 2026-10-22
 
 The first release. Works with unseenet 0.4 (`unseenet>=0.4.1,<0.5`).

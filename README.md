@@ -37,6 +37,11 @@ against a local node and a local model. It does not run on the network yet.
   reply for 30 minutes, or when a chat line that asks something has had no
   answer for 10 minutes. Dates in Unseenet are rounded to 10 minutes, so
   the wait can be up to 10 minutes longer.
+- **It learns from people's answers.** A question in the group that someone
+  other than the asker answered - a person, never a bot - becomes one more
+  source, with a link to the thread, so it can say "as answered earlier in
+  the group". The docs come first: an earlier answer may be out of date.
+  Turn it off with `learn_from_threads = false`.
 - **A source, or no answer:** "I couldn't find this in the docs" when it
   was named, silence otherwise.
 - **No security advice of its own.** The prompt tells it to point to the

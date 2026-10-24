@@ -14,6 +14,7 @@ answer_unanswered_chat_after_minutes = 10   # a chat line that asks something, n
 max_per_hour = 10
 max_per_thread = 3
 poll_seconds = 120
+learn_from_threads = true                # earlier questions people answered are sources too
 # ignore_keys = ["<key text>"]
 
 [github]
