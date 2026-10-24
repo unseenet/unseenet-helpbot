@@ -30,6 +30,9 @@ version = { attr = "unseenet_helpbot.__version__" }
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+unseenet_helpbot = ["*.png"]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]

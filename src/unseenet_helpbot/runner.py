@@ -28,9 +28,31 @@ from . import bot, github, llm
 from .docs import Index
 
 PASS_ENV = "UNSEENET_VAULT_PASSPHRASE"
-ABOUT = ("I answer questions in the Unseenet help group from the project's documentation, "
-         "and say where each answer comes from. I can be wrong. Code: "
-         "https://github.com/unseenet/unseenet-helpbot")
+ABOUT = """\
+# Unseenet help :robot:
+
+Ask me anything about **[Unseenet](https://unseenet.org)** in
+[unseenet.help](unseenet:join?g=unseenet.help@ph5fc5hop5232qsz) -
+getting started, keys and ripening, nodes, groups, following and posting.
+
+## How I work
+
+- I answer from the [guide](https://unseenet.org/guide/), the
+  [UN-RFCs](https://unseenet.org/spec/) and the project's
+  [issues on GitHub](https://github.com/unseenet)
+- I am a bot and can be wrong - people in the group may correct me
+- Write in English or Danish - *jeg svarer også på dansk*
+
+## Not me you need?
+
+The project talks in [unseenet](unseenet:join?g=unseenet@ph5fc5hop5232qsz),
+news are in [unseenet.announce](unseenet:join?g=unseenet.announce@ph5fc5hop5232qsz),
+and the project is run by [Andreas](unseenet:b4xkhrco5yii4dw7).
+"""   # the public profile, Markdown (UN-RFC 0022 section 4.1)
+PROFILE_LINKS = [{"kind": "web", "value": "https://unseenet.org/guide/"},
+                 {"kind": "github", "value": "https://github.com/unseenet/unseenet-helpbot"}]
+PICTURE = "helpbot.png"          # a robot head with the Unseenet eye; source assets/helpbot.svg
+PICTURE_ALT = "A robot head whose face is the Unseenet eye"
 
 
 @dataclass
@@ -157,19 +179,49 @@ async def bot_keys(s: Session, keys: set[str]) -> set[str]:
     return {k for k in keys if s.is_bot(k)}
 
 
-async def publish_profile(s: Session, log=print) -> None:
-    """Once per vault: a public profile with the bot mark, so clients show it as a bot."""
-    if s.data.get("helpbot_profile"):
-        return
+def profile() -> dict:
+    """The public profile: the bot mark, Markdown About text, links and languages."""
     from unseenet.core.profiles import make_profile
-    try:
-        await s.publish_profile(make_profile(about=ABOUT, lang=["en", "da"], bot=True))
-    except (SessionError, OSError, ConnectionError) as exc:
-        log(f"could not publish the profile yet: {exc}")
-        return
-    s.data["helpbot_profile"] = True
-    s.save()
-    log("published the profile with the bot mark")
+    return make_profile(about=ABOUT, links=PROFILE_LINKS, lang=["en", "da"],
+                        bot=True, markdown=True)
+
+
+def _mark(data: bytes) -> str:
+    import hashlib
+    return hashlib.sha256(data).hexdigest()[:16]
+
+
+def profile_mark() -> str:
+    """A short hash of the profile, kept in the vault: a changed text is published again."""
+    import json
+    return _mark(json.dumps(profile(), sort_keys=True).encode())
+
+
+async def publish_profile(s: Session, log=print) -> None:
+    """At start: publish the profile and the picture when they are new or have changed,
+    so clients show the bot mark and the current text."""
+    from importlib.resources import as_file, files
+    if s.data.get("helpbot_profile") != profile_mark():
+        try:
+            await s.publish_profile(profile())
+        except (SessionError, OSError, ConnectionError) as exc:
+            log(f"could not publish the profile yet: {exc}")
+            return
+        s.data["helpbot_profile"] = profile_mark()
+        s.save()
+        log("published the profile with the bot mark")
+    picture = files("unseenet_helpbot").joinpath(PICTURE)
+    mark = _mark(picture.read_bytes())
+    if s.data.get("helpbot_picture") != mark:
+        try:
+            with as_file(picture) as path:
+                await s.publish_picture_file(path, PICTURE_ALT)
+        except (SessionError, OSError, ConnectionError, ValueError) as exc:
+            log(f"could not publish the picture yet: {exc}")
+            return
+        s.data["helpbot_picture"] = mark
+        s.save()
+        log("published the profile picture")
 
 
 async def look_once(s: Session, cfg: Config, index: Index, state: bot.State,
