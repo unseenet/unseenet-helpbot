@@ -51,7 +51,7 @@ and the project is run by [Andreas](unseenet:b4xkhrco5yii4dw7).
 """   # the public profile, Markdown (UN-RFC 0022 section 4.1)
 PROFILE_LINKS = [{"kind": "web", "value": "https://unseenet.org/guide/"},
                  {"kind": "github", "value": "https://github.com/unseenet/unseenet-helpbot"}]
-PICTURE = "helpbot.png"          # a robot head with the Unseenet eye; source assets/helpbot.svg
+PICTURE = "helpbot-profile.webp"  # 128 px, ready to publish; source assets/helpbot.svg
 PICTURE_ALT = "A robot head whose face is the Unseenet eye"
 
 
@@ -200,7 +200,9 @@ def profile_mark() -> str:
 async def publish_profile(s: Session, log=print) -> None:
     """At start: publish the profile and the picture when they are new or have changed,
     so clients show the bot mark and the current text."""
-    from importlib.resources import as_file, files
+    from importlib.resources import files
+
+    from unseenet.core.profiles import make_picture
     if s.data.get("helpbot_profile") != profile_mark():
         try:
             await s.publish_profile(profile())
@@ -210,12 +212,11 @@ async def publish_profile(s: Session, log=print) -> None:
         s.data["helpbot_profile"] = profile_mark()
         s.save()
         log("published the profile with the bot mark")
-    picture = files("unseenet_helpbot").joinpath(PICTURE)
-    mark = _mark(picture.read_bytes())
+    data = files("unseenet_helpbot").joinpath(PICTURE).read_bytes()
+    mark = _mark(data)
     if s.data.get("helpbot_picture") != mark:
-        try:
-            with as_file(picture) as path:
-                await s.publish_picture_file(path, PICTURE_ALT)
+        try:              # already the middle square, 128 px WebP without metadata (8.1)
+            await s.publish_picture(make_picture(data, "image/webp", 128, alt=PICTURE_ALT))
         except (SessionError, OSError, ConnectionError, ValueError) as exc:
             log(f"could not publish the picture yet: {exc}")
             return
