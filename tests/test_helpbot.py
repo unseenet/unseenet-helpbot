@@ -225,3 +225,45 @@ async def test_end_to_end_on_a_node(tmp_path, monkeypatch):
     assert "Claim a name [1]" in answer[0].body and "un-rfc-0019" in answer[0].body
     await s.close(); await owner.close()
     server.close()
+
+
+# --- earlier answered threads (#5) ------------------------------------------------
+
+def test_answered_threads_become_excerpts():
+    from unseenet_helpbot.threads import thread_chunks
+    q = msg("<q@x>", ALICE, subject="How do I claim a name?", body="How do I claim a name?\n")
+    a = msg("<a@x>", BOB, refs=["<q@x>"], subject="Re: How do I claim a name?",
+            body="> How do I\nUse the command palette and Claim a name.\n", name="Bob")
+    own = msg("<o@x>", ALICE, refs=["<q@x>"], subject="Re:", body="Thanks!\n")
+    [c] = thread_chunks([q, a, own], "unseenet.help@aaaaaaaaaaaaaaaa", not_people={BOT})
+    assert c.kind == "thread" and c.title.endswith("How do I claim a name?")
+    assert "Answer by Bob:\nUse the command palette" in c.text and "Thanks" not in c.text
+    assert "> How do I" not in c.text and c.url.startswith("unseenet:")
+    assert c.label == c.title
+
+
+def test_only_people_answer_and_only_questions_count():
+    from unseenet_helpbot.threads import thread_chunks
+    q = msg("<q@x>", ALICE, subject="How do I claim a name?")
+    by_bot = msg("<b@x>", BOT, refs=["<q@x>"], body="Like this.\n", name="Unseenet help (bot)")
+    by_other_bot = msg("<c@x>", "other-bot", refs=["<q@x>"], body="Or so.\n", name="News (bot)")
+    assert thread_chunks([q, by_bot, by_other_bot], "g", not_people={BOT}) == []
+    news = msg("<n@x>", ALICE, subject="Release 0.5.0", body="It is out.\n")
+    reply = msg("<r@x>", BOB, refs=["<n@x>"], body="Nice.\n")
+    assert thread_chunks([news, reply], "g", not_people=set()) == []          # not a question
+
+
+def test_the_index_takes_threads_and_caps_them(tmp_path):
+    from unseenet_helpbot.threads import thread_chunks
+    write_docs(tmp_path)
+    idx = Index.from_folders([tmp_path])
+    qs, answers = [], []
+    for i in range(4):
+        qs.append(msg(f"<q{i}@x>", ALICE, subject=f"How do I claim a name {i}?"))
+        answers.append(msg(f"<a{i}@x>", BOB, refs=[f"<q{i}@x>"], body="Claim a name in the palette.\n"))
+    learned = thread_chunks(qs + answers, "g", not_people=set())
+    assert idx.replace("thread", learned) is True and idx.replace("thread", learned) is False
+    hits = [c for _, c in idx.search("claim a name", k=8)]
+    assert sum(c.kind == "thread" for c in hits) == 2                       # at most two
+    assert any(c.kind == "docs" for c in hits)
+    assert idx.replace("thread", []) is True and not any(c.kind == "thread" for c in idx.chunks)

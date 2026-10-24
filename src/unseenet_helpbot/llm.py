@@ -33,6 +33,9 @@ seems likely.
 broken, what was fixed and what is planned - not how the software works today. Say so: \
 "a known problem, open in #140", "fixed in #123", "planned for milestone 0.4.0". An open \
 issue is not fixed yet. Never promise a date.
+- Some excerpts are earlier answers by people in the help group. Prefer the \
+documentation where they differ: an earlier answer may be out of date. When you use one, \
+say so ("as answered earlier in the group").
 - Never give advice of your own about anonymity, threat models or protecting someone. If \
 asked, say that Unseenet is pre-alpha and not security reviewed, and point to the docs.
 - Be short: a few sentences or a short list. Use Markdown sparingly.
@@ -94,7 +97,7 @@ def excerpts(chunks: list[Chunk], limit: int = 1200, issue_limit: int = 700) -> 
     issue's title, state and first paragraphs say most of what it is about."""
     out = []
     for i, c in enumerate(chunks, 1):
-        n = issue_limit if c.kind == "issue" else limit
+        n = issue_limit if c.kind in ("issue", "thread") else limit
         text = c.text if len(c.text) <= n else c.text[:n] + " ..."
         out.append(f"[{i}] {c.label}\n{text}")
     return "\n\n".join(out)

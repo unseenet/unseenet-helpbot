@@ -35,14 +35,15 @@ class Chunk:
     heading: str              # the section's heading ("" before the first one)
     text: str
     url: str
-    kind: str = "docs"        # "docs", "issue" (an issue or a pull request) or "repo"
+    kind: str = "docs"        # "docs", "issue" (an issue or a pull request), "repo", or
+                              # "thread" (an earlier answer in the help group, #5)
     repo: str = ""            # the repository, for files from GitHub
     terms: Counter = field(default_factory=Counter, repr=False)
 
     @property
     def label(self) -> str:
         """How an answer names this source, e.g. 'UN-RFC 0019, 4. Registered names'."""
-        if self.kind in ("issue", "repo"):
+        if self.kind in ("issue", "repo", "thread"):
             return self.title
         m = _RFC_NUM.search(self.path)
         doc = f"UN-RFC {m.group(1)}" if m else self.title
@@ -172,7 +173,17 @@ class Index:
                 chunks.extend(chunk_file(f, rel))
         return cls(chunks)
 
-    def search(self, query: str, k: int = 5, max_issues: int = 3) -> list[tuple[float, Chunk]]:
+    def replace(self, kind: str, chunks: list[Chunk]) -> bool:
+        """Put ``chunks`` in place of those of ``kind`` (the help group's answered
+        threads, #5), counting the terms again. False when nothing changed."""
+        old = [c for c in self.chunks if c.kind == kind]
+        if [(c.path, c.text) for c in old] == [(c.path, c.text) for c in chunks]:
+            return False
+        self.__init__([c for c in self.chunks if c.kind != kind] + chunks, self.k1, self.b)
+        return True
+
+    def search(self, query: str, k: int = 5, max_issues: int = 3,
+               max_threads: int = 2) -> list[tuple[float, Chunk]]:
         q = Counter(tokens(query))
         scored = []
         for c in self.chunks:
@@ -189,11 +200,12 @@ class Index:
         out: list[tuple[float, Chunk]] = []
         per_doc: Counter = Counter()
         for s, c in scored:                       # at most two pieces of one document
-            if per_doc[c.path] >= 2 or (c.kind == "issue" and per_doc["#issues"] >= max_issues):
+            if per_doc[c.path] >= 2 or (c.kind == "issue" and per_doc["#issues"] >= max_issues) \
+                    or (c.kind == "thread" and per_doc["#threads"] >= max_threads):
                 continue
             per_doc[c.path] += 1
-            if c.kind == "issue":
-                per_doc["#issues"] += 1
+            if c.kind in ("issue", "thread"):
+                per_doc["#" + c.kind + "s"] += 1
             out.append((s, c))
             if len(out) >= k:
                 break

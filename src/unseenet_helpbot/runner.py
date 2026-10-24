@@ -26,6 +26,10 @@ from unseenet.core.vault import Vault
 
 from . import bot, github, llm
 from .docs import Index
+from .threads import thread_chunks
+
+_BOTS: set[str] = set()        # keys whose profile carries the bot mark, as found so far
+_SEEN: set[str] = set()        # keys already looked up
 
 PASS_ENV = "UNSEENET_VAULT_PASSPHRASE"
 ABOUT = """\
@@ -70,6 +74,7 @@ class Config:
     github: github.GitHub | None = None
     github_cache: Path = Path("~/.local/state/unseenet-helpbot/github.json").expanduser()
     github_hours: float = 6.0
+    learn: bool = True          # answer from earlier answered threads of the group too (#5)
 
 
 def load_config(path: str | Path) -> Config:
@@ -100,7 +105,8 @@ def load_config(path: str | Path) -> Config:
                                  token=os.environ.get(g.get("token_env", ""), "") if g.get("token_env") else "")
                    if g.get("enabled", True) and g else None,
             github_cache=Path(g.get("cache_file", "~/.local/state/unseenet-helpbot/github.json")).expanduser(),
-            github_hours=float(g.get("refresh_hours", 6)))
+            github_hours=float(g.get("refresh_hours", 6)),
+            learn=bool(b.get("learn_from_threads", True)))
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -240,8 +246,18 @@ async def look_once(s: Session, cfg: Config, index: Index, state: bot.State,
     rules = cfg.rules
     bots = await bot_keys(s, {m.author_key for m in msgs
                               if m.message_id not in state.handled and m.author_key not in me})
+    _BOTS.update(bots)
     if bots:
         rules = dataclasses.replace(rules, ignore_keys=rules.ignore_keys | bots)
+    if cfg.learn:                       # earlier answered threads, as excerpts (#5)
+        authors = {m.author_key for m in msgs if m.author_key} - me - _SEEN
+        if authors:
+            _BOTS.update(await bot_keys(s, authors))
+            _SEEN.update(authors)
+        learned = thread_chunks(msgs, cfg.group,
+                                not_people=me | _BOTS | cfg.rules.ignore_keys)
+        if index.replace("thread", learned):
+            log(f"{len(learned)} answered threads of the group to answer from")
     todo = bot.select(msgs, me=me, mine=s.my_message_ids(), rules=rules, state=state)
     posted = 0
     for t in todo:
