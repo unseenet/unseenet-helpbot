@@ -36,7 +36,7 @@ ABOUT = """\
 # Unseenet help :robot:
 
 Ask me anything about **[Unseenet](https://unseenet.org)** in
-[unseenet.help](unseenet:join?g=unseenet.help@ph5fc5hop5232qsz) -
+[unseenet.help](unseenet:unseenet.help@ph5fc5hop5232qsz) -
 getting started, keys and ripening, nodes, groups, following and posting.
 
 ## How I work
@@ -49,8 +49,8 @@ getting started, keys and ripening, nodes, groups, following and posting.
 
 ## Not me you need?
 
-The project talks in [unseenet](unseenet:join?g=unseenet@ph5fc5hop5232qsz),
-news are in [unseenet.announce](unseenet:join?g=unseenet.announce@ph5fc5hop5232qsz),
+The project talks in [unseenet](unseenet:unseenet@ph5fc5hop5232qsz),
+news are in [unseenet.announce](unseenet:unseenet.announce@ph5fc5hop5232qsz),
 and the project is run by [Andreas](unseenet:b4xkhrco5yii4dw7).
 """   # the public profile, Markdown (UN-RFC 0022 section 4.1)
 PROFILE_LINKS = [{"kind": "web", "value": "https://unseenet.org/guide/"},
