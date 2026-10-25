@@ -4,8 +4,8 @@ A bot that follows the help group on [Unseenet](https://unseenet.org)
 and answers questions from the project's documentation and specs, using a
 small language model that runs locally.
 
-**Status:** early. It reads the group, answers with sources, and is tested
-against a local node and a local model. It does not run on the network yet.
+**Status:** early. It reads `unseenet.help`, answers with sources, and runs
+for the project on its own small cloud VM with a local model.
 
 ## How it works
 
@@ -96,12 +96,32 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and a
 GitHub release for each tag. This is one of the project's own services, so it
 is not on PyPI. Each release names the minor version of unseenet it works with
-(`unseenet>=0.4.1,<0.5`).
+(`unseenet>=0.5,<0.6`).
 
 To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
 new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
 `src/unseenet_helpbot/__init__.py`, commit, then
 `git tag -a vX.Y.Z -m "unseenet-helpbot X.Y.Z" && git push origin vX.Y.Z`.
+
+## Part of Unseenet
+
+Unseenet is made in several repositories, each released on its own:
+
+| Repository | What it is |
+|---|---|
+| [unseenet](https://github.com/unseenet/unseenet) | The protocol (UN-RFCs), the core library, the node and the command-line client |
+| [unseenet-tui](https://github.com/unseenet/unseenet-tui) | The terminal client (moving here from unseenet, unseenet#548) |
+| [unseenet-gui](https://github.com/unseenet/unseenet-gui) | The graphical client - in a window, booted, or in a browser |
+| [unseenet-portable](https://github.com/unseenet/unseenet-portable) | Builds the portable clients, Terminal and Graphical, with Tor inside (unseenet#549) |
+| [unseenet-bootable](https://github.com/unseenet/unseenet-bootable) | Builds the bootable images, Terminal and Graphical, and later a node image (unseenet#550) |
+| [unseenet-docs](https://github.com/unseenet/unseenet-docs) | The site [unseenet.org](https://unseenet.org), gathering the docs of every repository (unseenet#547) |
+| [unseenet-entrance](https://github.com/unseenet/unseenet-entrance) | Web entrances: the graphical client in an ordinary browser |
+| [unseenet-gateway](https://github.com/unseenet/unseenet-gateway) | Gateways to other networks: Usenet, Nostr, Matrix |
+| [unseenet-bots](https://github.com/unseenet/unseenet-bots) | Bots that keep channels filled with current content |
+| [unseenet-helpbot](https://github.com/unseenet/unseenet-helpbot) | The bot that answers questions in `unseenet.help` |
+| [unseenet-stats](https://github.com/unseenet/unseenet-stats) | Statistics for the network |
+| [unseenet-mcp](https://github.com/unseenet/unseenet-mcp) | An MCP server, so a language model can read and post as you (planning) |
+| [unseenet-demo](https://github.com/unseenet/unseenet-demo) | Demo people, feeds and sites, made with the command-line client |
 
 ## Licence
 
