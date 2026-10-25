@@ -7,6 +7,12 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-25
+
+### Changed
+
+- The bot's profile links groups as `unseenet:<group-id>`, the form clients from unseenet 0.5 open (unseenet#386), instead of `unseenet:join?g=`.
+
 ## [0.2.0] - 2026-10-25
 
 For unseenet 0.5 (`unseenet>=0.5,<0.6`); update the nodes first. The help bot learns from earlier answered threads.
@@ -39,6 +45,7 @@ The first release. Works with unseenet 0.4 (`unseenet>=0.4.1,<0.5`).
 - It ripens its key on to level 3 while running, posting through the core's
   `Session` (#6).
 
-[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/unseenet/unseenet-helpbot/releases/tag/v0.1.0
