@@ -12,7 +12,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Andreas Lorensen" }]
 requires-python = ">=3.11"
 dependencies = [
-    "unseenet>=0.4.1,<0.5",   # one minor version of the core at a time
+    "unseenet>=0.5,<0.6",   # one minor version of the core at a time
 ]
 
 [project.optional-dependencies]
