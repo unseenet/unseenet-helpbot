@@ -58,6 +58,7 @@ ollama pull qwen2.5:7b
 cp helpbot.example.toml helpbot.toml        # fill in the group
 export UNSEENET_VAULT_PASSPHRASE=...
 unseenet-helpbot -c helpbot.toml sync       # fetch the repositories, issues and PRs
+                                            # (and their comments, with a token: #15)
 unseenet-helpbot -c helpbot.toml ask "How do I run a node?"   # try it, no network
 unseenet-helpbot -c helpbot.toml init       # the bot's vault and key
 unseenet-helpbot -c helpbot.toml run --once --dry-run   # what would it answer?

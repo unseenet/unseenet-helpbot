@@ -24,7 +24,11 @@ org = "unseenet"
 refresh_hours = 6
 issues = true
 # exclude = ["some-experiment"]
-# token_env = "HELPBOT_GITHUB_TOKEN"     # only needed past GitHub's 60 requests an hour
+# A read-only token (fine-grained, public repositories) in this environment variable:
+# needed past GitHub's 60 requests an hour, and for the comments on issues and PRs (#15) -
+# the last two of each and every decision by a member ("accepted", "going with",
+# "not planned" ...), fetched since the last sync. Without one: no comments.
+# token_env = "HELPBOT_GITHUB_TOKEN"
 cache_file = "~/.local/state/unseenet-helpbot/github.json"
 
 [model]

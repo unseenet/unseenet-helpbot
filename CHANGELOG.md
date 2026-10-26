@@ -7,6 +7,10 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+- **Where issues ended** (#15): with a token, the comments on issues and PRs
+  are sources too - the last two of each and every decision by a member - fetched
+  since the last sync in one call per repository (a full fetch weekly), and put
+  before the issue's text, so "why was X dropped?" is answered from the decision.
 - **Answers from the clients, not the protocol** (#14): every source has a role
   (how-to, guide, spec, issue, docs); how-to pages count most and at most two
   UN-RFC pieces are used, unless the question is about the design; the model is
