@@ -41,6 +41,26 @@ class Chunk:
     terms: Counter = field(default_factory=Counter, repr=False)
 
     @property
+    def role(self) -> str:
+        """What the chunk is for (#14): ``howto`` (how you do it in the clients, and
+        earlier answers in the help group), ``guide`` (the walkthrough), ``spec`` (the
+        UN-RFCs: how it is meant to work), ``history`` (issues and pull requests) or
+        ``docs`` (the rest)."""
+        if self.kind == "issue":
+            return "history"
+        if self.kind == "thread":
+            return "howto"
+        p = self.path.lower()
+        name = p.rsplit("/", 1)[-1]
+        if _RFC_NUM.search(p) or p.startswith(("spec/", "rfc/")) or "/spec/" in p or "/rfc/" in p:
+            return "spec"
+        if self.repo in HOWTO_REPOS or name in HOWTO_FILES or "/howto/" in f"/{p}":
+            return "howto"
+        if p.startswith("guide/") or "/guide/" in p:
+            return "guide"
+        return "docs"
+
+    @property
     def label(self) -> str:
         """How an answer names this source, e.g. 'UN-RFC 0019, 4. Registered names'."""
         if self.kind in ("issue", "repo", "thread"):
@@ -137,8 +157,16 @@ def _split(text: str) -> list[str]:
     return parts
 
 
+# #14: people want the steps in the programs, not the protocol: how-to pages count most
+HOWTO_REPOS = {"unseenet-gui", "unseenet-tui"}
+HOWTO_FILES = {"client.md", "graphical.md", "portable.md", "bootable.md", "updating.md",
+               "terminal.md", "gui.md", "tui.md"}
+ROLE_WEIGHT = {"howto": 1.6, "guide": 1.25, "docs": 1.0, "history": 0.9, "spec": 0.65}
+_ABOUT_SPEC = re.compile(r"\b(rfc|un-rfc|protocol|spec|specification|why|designed?|meant)\b", re.I)
+
+
 class Index:
-    """BM25 over sections of Markdown files."""
+    """BM25 over sections of Markdown files, weighted by what a chunk is for (#14)."""
 
     def __init__(self, chunks: list[Chunk], k1: float = 1.4, b: float = 0.75):
         seen, unique = set(), []
@@ -183,8 +211,11 @@ class Index:
         return True
 
     def search(self, query: str, k: int = 5, max_issues: int = 3,
-               max_threads: int = 2) -> list[tuple[float, Chunk]]:
+               max_threads: int = 2, max_spec: int = 2) -> list[tuple[float, Chunk]]:
         q = Counter(tokens(query))
+        weights = dict(ROLE_WEIGHT)
+        if _ABOUT_SPEC.search(query):          # a question about the design: the RFCs count
+            weights["spec"] = 1.0
         scored = []
         for c in self.chunks:
             length = sum(c.terms.values())
@@ -195,15 +226,18 @@ class Index:
                     s += self.idf[t] * tf * (self.k1 + 1) / (
                         tf + self.k1 * (1 - self.b + self.b * length / self.avg))
             if s > 0:
-                scored.append((s, c))
+                scored.append((s * weights.get(c.role, 1.0), c))
         scored.sort(key=lambda sc: sc[0], reverse=True)
         out: list[tuple[float, Chunk]] = []
         per_doc: Counter = Counter()
         for s, c in scored:                       # at most two pieces of one document
             if per_doc[c.path] >= 2 or (c.kind == "issue" and per_doc["#issues"] >= max_issues) \
-                    or (c.kind == "thread" and per_doc["#threads"] >= max_threads):
+                    or (c.kind == "thread" and per_doc["#threads"] >= max_threads) \
+                    or (c.role == "spec" and per_doc["#specs"] >= max_spec):
                 continue
             per_doc[c.path] += 1
+            if c.role == "spec":
+                per_doc["#specs"] += 1
             if c.kind in ("issue", "thread"):
                 per_doc["#" + c.kind + "s"] += 1
             out.append((s, c))
