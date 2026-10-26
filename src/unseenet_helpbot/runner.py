@@ -115,7 +115,11 @@ def open_session(cfg: Config, log=print) -> Session:
     pw = os.environ.get(PASS_ENV)
     if not pw:
         raise SystemExit(f"set {PASS_ENV} to the bot vault's passphrase")
-    return Session(Vault.open(cfg.vault, pw), status=log)
+    s = Session(Vault.open(cfg.vault, pw), status=log)
+    # a program, not a person: it keeps its name (help@unseenet) up when it posts
+    # (core 0.6, unseenet#592); older cores ignore it
+    s.service = True
+    return s
 
 
 def cmd_init(cfg: Config) -> None:
