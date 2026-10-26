@@ -7,6 +7,14 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+- **News** (#13, `[news]`, off by default): releases told in plain language in
+  `unseenet.help.news` - stable ones only, those released together in one post
+  ("What's new: Unseenet 0.6.0 and the graphical client 0.3.0"), written by the
+  model from the release notes and CHANGELOG with the answers' rules, linking the
+  official notes; nothing old ever, nothing when the model fails (tried 3 times).
+  The comments under its posts are answered as in the help group. `news --dry-run`
+  shows the post first.
+
 - **Where issues ended** (#15): with a token, the comments on issues and PRs
   are sources too - the last two of each and every decision by a member - fetched
   since the last sync in one call per repository (a full fetch weekly), and put

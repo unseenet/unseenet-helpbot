@@ -75,6 +75,9 @@ class Config:
     github_cache: Path = Path("~/.local/state/unseenet-helpbot/github.json").expanduser()
     github_hours: float = 6.0
     learn: bool = True          # answer from earlier answered threads of the group too (#5)
+    news_group: str = ""        # [news] (#13): the feed it tells about releases in; "" is off
+    news_gather_hours: float = 2.0
+    news_max_tries: int = 3
 
 
 def load_config(path: str | Path) -> Config:
@@ -106,7 +109,10 @@ def load_config(path: str | Path) -> Config:
                    if g.get("enabled", True) and g else None,
             github_cache=Path(g.get("cache_file", "~/.local/state/unseenet-helpbot/github.json")).expanduser(),
             github_hours=float(g.get("refresh_hours", 6)),
-            learn=bool(b.get("learn_from_threads", True)))
+            learn=bool(b.get("learn_from_threads", True)),
+            news_group=str(d.get("news", {}).get("group", "")) if d.get("news", {}).get("enabled") else "",
+            news_gather_hours=float(d.get("news", {}).get("gather_hours", 2)),
+            news_max_tries=int(d.get("news", {}).get("max_tries", 3)))
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -294,6 +300,35 @@ async def look_once(s: Session, cfg: Config, index: Index, state: bot.State,
     return posted
 
 
+async def news_once(s: Session, cfg: Config, index: Index, news_state, answers, dry_run: bool,
+                    log=print) -> None:
+    """[news] (#13): post what is due about releases, and answer the comments under the
+    bot's posts as it answers in the help group."""
+    from . import news
+    try:
+        await news.post_news(s, cfg.news_group, cfg.model, github.load_cache(cfg.github_cache),
+                             news_state, gather_hours=cfg.news_gather_hours,
+                             max_tries=cfg.news_max_tries, dry_run=dry_run, log=log)
+    except (SessionError, OSError, ConnectionError) as exc:
+        log(f"news: could not post: {exc}")
+    await look_once(s, dataclasses.replace(cfg, group=cfg.news_group), index, answers, dry_run, log)
+
+
+async def cmd_news(cfg: Config) -> None:
+    """``news --dry-run``: the post it would write now, from the cache, sending nothing."""
+    from . import news
+    if not cfg.news_group:
+        raise SystemExit("[news] is not enabled in the config")
+    st = news.NewsState.load(cfg.state_file.with_name("news.json"))
+    st.path = None
+    if st.fresh:
+        print("news: first run - every release so far counts as seen; nothing to post")
+    out = await news.post_news(None, cfg.news_group, cfg.model, github.load_cache(cfg.github_cache),
+                               st, gather_hours=0, max_tries=cfg.news_max_tries, dry_run=True)
+    if out is None:
+        print("news: nothing to post now")
+
+
 async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     s = open_session(cfg)
     if not s.has_identity():
@@ -301,6 +336,15 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     if cfg.group not in s.data["subscribed"]:
         s.subscribe(cfg.group)
     state = bot.State.load(cfg.state_file)
+    news_state = answers = None
+    if cfg.news_group:                             # #13
+        from . import news
+        if cfg.news_group not in s.data["subscribed"]:
+            s.subscribe(cfg.news_group)
+        news_state = news.NewsState.load(cfg.state_file.with_name("news.json"))
+        answers = bot.State.load(cfg.state_file.with_name("news-answers.json"))
+        if dry_run:
+            news_state.path = answers.path = None
     if dry_run:
         state.path = None                          # look, but remember nothing
     await sync_github(cfg)
@@ -320,6 +364,11 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
                 await look_once(s, cfg, index, state, dry_run)
             except (SessionError, OSError, ConnectionError) as exc:
                 print(f"could not read the group: {exc}")
+            if cfg.news_group:
+                try:
+                    await news_once(s, cfg, index, news_state, answers, dry_run)
+                except (SessionError, OSError, ConnectionError) as exc:
+                    print(f"could not read the news group: {exc}")
             if once:
                 break
             await asyncio.sleep(cfg.poll)
@@ -338,6 +387,8 @@ def main(argv: list[str] | None = None) -> None:
     a = sub.add_parser("ask", help="answer one question from the docs, without the network")
     a.add_argument("question")
     sub.add_parser("sync", help="fetch the repositories, issues and PRs from GitHub now")
+    n = sub.add_parser("news", help="the news post it would write now about releases (#13)")
+    n.add_argument("--dry-run", action="store_true", required=True, help="show it, send nothing")
     r = sub.add_parser("run", help="follow the group and answer")
     r.add_argument("--once", action="store_true", help="look once, then stop")
     r.add_argument("--dry-run", action="store_true", help="show answers instead of posting")
@@ -348,6 +399,8 @@ def main(argv: list[str] | None = None) -> None:
             cmd_init(cfg)
         elif args.cmd == "ask":
             asyncio.run(cmd_ask(cfg, args.question))
+        elif args.cmd == "news":
+            asyncio.run(cmd_news(cfg))
         elif args.cmd == "sync":
             asyncio.run(sync_github(cfg, force=True))
             print(f"{len(build_index(cfg).chunks)} sections in all")

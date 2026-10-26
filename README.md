@@ -57,6 +57,7 @@ pip install "unseenet-helpbot @ git+https://github.com/unseenet/unseenet-helpbot
 ollama pull qwen2.5:7b
 cp helpbot.example.toml helpbot.toml        # fill in the group
 export UNSEENET_VAULT_PASSPHRASE=...
+unseenet-helpbot -c helpbot.toml news --dry-run   # the news post it would write now (#13)
 unseenet-helpbot -c helpbot.toml sync       # fetch the repositories, issues and PRs
                                             # (and their comments, with a token: #15)
 unseenet-helpbot -c helpbot.toml ask "How do I run a node?"   # try it, no network

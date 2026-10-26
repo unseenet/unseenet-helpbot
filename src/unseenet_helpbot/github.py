@@ -48,6 +48,7 @@ class GitHub:
     exclude: set[str] = field(default_factory=set)
     issues: bool = True
     comments: bool = True            # their comments too (#15), only with a token
+    releases: bool = True            # the releases, for the news (#13)
     fetch: Fetch | None = None       # for tests
 
     def _get(self, url: str) -> bytes:
@@ -136,6 +137,12 @@ class GitHub:
                         continue
                     raw = self._get(f"{RAW}/{self.org}/{name}/{branch}/{urllib.parse.quote(p)}")
                     entry["files"][p] = raw.decode("utf-8", "replace")
+                if self.releases:                     # for the news (#13)
+                    try:
+                        entry["releases"] = [_release(x) for x in self._json(
+                            f"{API}/repos/{self.org}/{name}/releases?per_page=30")]
+                    except (OSError, ValueError, KeyError):
+                        entry["releases"] = (before.get(name) or {}).get("releases", [])
                 if self.issues:
                     for it in self._pages(f"{API}/repos/{self.org}/{name}/issues?state=all"):
                         entry["issues"].append(_issue(it))
@@ -166,6 +173,12 @@ def _issue(it: dict) -> dict:
             "milestone": (it.get("milestone") or {}).get("title"),
             "url": it["html_url"], "body": (it.get("body") or "")[:MAX_BODY],
             "updated": it.get("updated_at", "")}
+
+
+def _release(r: dict) -> dict:
+    return {"tag": r.get("tag_name", ""), "name": r.get("name") or "", "body": (r.get("body") or "")[:8000],
+            "draft": bool(r.get("draft")), "prerelease": bool(r.get("prerelease")),
+            "published": r.get("published_at") or "", "url": r.get("html_url") or ""}
 
 
 def file_url(org: str, repo: str, path: str) -> str:
