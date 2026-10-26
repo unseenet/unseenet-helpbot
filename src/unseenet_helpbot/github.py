@@ -13,6 +13,7 @@ set a token (read-only, public repositories) for more.
 from __future__ import annotations
 
 import json
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -29,6 +30,13 @@ SKIP_PARTS = {"node_modules", "build", "dist", ".venv", "venv", "site", "tests",
               "ISSUE_TEMPLATE", "PULL_REQUEST_TEMPLATE"}
 SKIP_NAMES = {"LICENSE.md", "NOTICE.md", "CODE_OF_CONDUCT.md"}
 MAX_BODY = 6000           # of an issue or pull request
+MAX_COMMENT = 1500        # of a kept comment (#15)
+FULL_COMMENTS_DAYS = 7    # a full fetch of the comments now and then: deletions go
+# a comment that says where an issue ended (#15) - by a member, with such words
+DECISION = re.compile(r"\b(accepted|agreed|decided|decision|going with|closing|closed as|"
+                      r"fixed in|released in|merged in|not planned|won'?t|enig|besluttet|"
+                      r"vi går med|lukker|aftalt)\b", re.I)
+MEMBERS = {"OWNER", "MEMBER", "COLLABORATOR"}
 
 Fetch = Callable[[str], bytes]
 
@@ -39,6 +47,7 @@ class GitHub:
     token: str = ""
     exclude: set[str] = field(default_factory=set)
     issues: bool = True
+    comments: bool = True            # their comments too (#15), only with a token
     fetch: Fetch | None = None       # for tests
 
     def _get(self, url: str) -> bytes:
@@ -69,9 +78,50 @@ class GitHub:
         return [r for r in rs if not r.get("private") and r["name"] not in self.exclude
                 and not r.get("fork")]
 
-    def sync(self, log=print) -> dict:
-        """Everything, fresh: {"synced": time, "repos": [{name, archived, files, issues}]}."""
+    def _comments(self, name: str, before: dict | None, log) -> tuple[dict, str, float]:
+        """The kept comments of a repository's issues and PRs (#15): all new and edited
+        ones since the last sync in one paged call, merged with what was kept; a full
+        fetch every FULL_COMMENTS_DAYS. Returns (comments by issue number, the time of
+        this sync, the time of the last full fetch)."""
+        before = before or {}
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        full = time.time() - before.get("comments_full", 0) > FULL_COMMENTS_DAYS * 86400
+        since = None if full else before.get("comments_synced")
+        url = f"{API}/repos/{self.org}/{name}/issues/comments?sort=updated&direction=asc"
+        if since:
+            url += f"&since={since}"
+        try:
+            got = self._pages(url)
+        except OSError as exc:                       # the rate limit: carry on next sync
+            log(f"github: {name}: comments stopped ({exc}); the rest at the next sync")
+            return before.get("comments", {}), before.get("comments_synced", ""), \
+                before.get("comments_full", 0)
+        kept = {} if full else {k: list(v) for k, v in before.get("comments", {}).items()}
+        for c in got:
+            user = (c.get("user") or {})
+            if user.get("type") == "Bot" or str(user.get("login", "")).endswith("[bot]"):
+                continue
+            number = str(c.get("issue_url", "")).rsplit("/", 1)[-1]
+            body = (c.get("body") or "").strip()
+            if not number.isdigit() or not body:
+                continue
+            item = {"id": c.get("id"), "user": user.get("login", ""),
+                    "date": (c.get("created_at") or "")[:10], "body": body[:MAX_COMMENT],
+                    "decision": c.get("author_association") in MEMBERS and bool(DECISION.search(body))}
+            rows = [x for x in kept.get(number, []) if x["id"] != item["id"]]
+            kept[number] = rows + [item]
+        for number, rows in kept.items():            # the last two, and every decision
+            rows.sort(key=lambda x: (x["date"], x["id"] or 0))
+            kept[number] = [x for i, x in enumerate(rows) if x["decision"] or i >= len(rows) - 2]
+        return kept, now, time.time() if full else before.get("comments_full", 0)
+
+    def sync(self, log=print, previous: dict | None = None) -> dict:
+        """Everything, fresh: {"synced": time, "repos": [{name, archived, files, issues,
+        comments}]}. ``previous`` (the last cache) lets comments be fetched since then."""
         out = {"synced": time.time(), "repos": []}
+        before = {r["name"]: r for r in (previous or {}).get("repos", [])}
+        if self.comments and self.issues and not self.token:
+            log("github: no token, so no comments on issues and PRs (#15)")
         for r in self.repos():
             name, branch = r["name"], r.get("default_branch") or "main"
             entry = {"name": name, "archived": bool(r.get("archived")),
@@ -89,6 +139,13 @@ class GitHub:
                 if self.issues:
                     for it in self._pages(f"{API}/repos/{self.org}/{name}/issues?state=all"):
                         entry["issues"].append(_issue(it))
+                    if self.comments and self.token:
+                        (entry["comments"], entry["comments_synced"],
+                         entry["comments_full"]) = self._comments(name, before.get(name), log)
+                    elif name in before:              # keep what was had
+                        for k in ("comments", "comments_synced", "comments_full"):
+                            if k in before[name]:
+                                entry[k] = before[name][k]
             except (OSError, ValueError, KeyError) as exc:
                 log(f"github: {name}: {exc}")
                 continue
@@ -135,14 +192,20 @@ def chunks(cache: dict, org: str = "unseenet") -> list[Chunk]:
         for path, text in r.get("files", {}).items():
             rel = f"{name}/{path}"
             out.extend(chunk_text(text, rel, file_url(org, name, path), repo=tag))
+        comments = r.get("comments", {})
         for it in r.get("issues", []):
             what = "PR" if it["pr"] else "issue"
             bits = [it["state"]] + ([f"milestone {it['milestone']}"] if it["milestone"] else [])
             title = f"{tag} {what} #{it['number']} ({', '.join(bits)}): {it['title']}"
             head = title + (f"\nLabels: {', '.join(it['labels'])}" if it["labels"] else "")
-            text = f"{head}\n\n{it['body']}".strip()
+            # where it ended first (#15): the decisions, then the last comment, then the body
+            said = sorted(comments.get(str(it["number"]), []), key=lambda x: not x["decision"])
+            ended = "\n\n".join(f"{'Decision' if x['decision'] else 'Comment'} "
+                                 f"({x['user']}, {x['date']}): {x['body']}" for x in said)
+            text = "\n\n".join(p for p in (head, ended, it["body"]) if p).strip()
             c = Chunk(f"gh:{name}#{it['number']}", title, "", text, it["url"], kind="issue")
-            c.terms = _terms(f"{it['title']} {it['title']} {' '.join(it['labels'])} {it['body']}")
+            c.terms = _terms(f"{it['title']} {it['title']} {' '.join(it['labels'])} {it['body']} "
+                             + " ".join(x["body"] for x in said))
             out.append(c)
     return out
 

@@ -156,7 +156,8 @@ async def sync_github(cfg: Config, force: bool = False, log=print) -> bool:
     if not force and datetime.now(timezone.utc).timestamp() - cache.get("synced", 0) < cfg.github_hours * 3600:
         return False
     try:
-        fresh = await asyncio.get_running_loop().run_in_executor(None, cfg.github.sync, log)
+        fresh = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: cfg.github.sync(log, previous=cache))      # comments since (#15)
     except (OSError, ValueError, KeyError) as exc:
         log(f"github: could not sync: {exc}")
         return False
