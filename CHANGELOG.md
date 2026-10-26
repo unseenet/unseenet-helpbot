@@ -7,6 +7,12 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+- **Answers from the clients, not the protocol** (#14): every source has a role
+  (how-to, guide, spec, issue, docs); how-to pages count most and at most two
+  UN-RFC pieces are used, unless the question is about the design; the model is
+  told to give the graphical client's steps first, the terminal client in a
+  sentence, the CLI only when asked, and to use the UN-RFCs only to explain why.
+
 ## [0.2.1] - 2026-10-25
 
 ### Changed
