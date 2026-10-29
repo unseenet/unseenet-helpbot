@@ -50,4 +50,5 @@ timeout = 300
 enabled = false
 group = "unseenet.help.news@ph5fc5hop5232qsz"
 gather_hours = 2        # releases this close together are one post (0.6.0: core, clients ...)
+per_look = 4            # sections written per look (one per release), so answers are not held up
 max_tries = 3           # if the model fails, try again this many times, then leave it

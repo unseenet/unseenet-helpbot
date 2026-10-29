@@ -7,6 +7,18 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-29
+
+- **News that actually gets written** (#29): the 0.6 releases were never posted, because
+  all ten went to the model in one prompt and every try timed out. Now the model writes
+  one short section per release, a few per look (`per_look` under `[news]`, default 4),
+  kept until all are written; the bot puts them together into one post, each section
+  tagged with its repository (`#unseenet-gui`) and linked to its release. If that post
+  cannot be posted, each release gets its own post (`[unseenet-gui] What's new: ...`).
+  Raw release notes are never posted - they are in `unseenet.announce`. The log says why
+  a section failed.
+- Names for the watchman, statistics, docs, MCP and demo repositories in the news.
+
 ## [0.3.0] - 2026-10-29
 
 Needs unseenet 0.6 (`unseenet>=0.6,<0.7`): update the nodes first.
