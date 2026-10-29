@@ -17,7 +17,8 @@ def cache(*extra):
     return {"repos": [
         {"name": "unseenet", "files": {"CHANGELOG.md": "# Changelog\n\n## [0.6.0] - 2026\n\n- **Export** your data.\n\n## [0.5.0]\n\n- old\n"},
          "releases": [rel("v0.5.0", T0 - 86400 * 10), rel("v0.6.0", T0), rel("v0.6.1rc1", T0),
-                      rel("dev", T0, prerelease=True), rel("v0.7.0", T0, draft=True), *extra]},
+                      rel("dev", T0, prerelease=True), rel("v0.7.0", T0, draft=True),
+                      rel("chiavdf-1.2.0-pyodide-314.0.7", T0), rel("web-20261029.1904", T0), *extra]},
         {"name": "unseenet-gui", "files": {}, "releases": [rel("v0.3.0", T0 + 1800)]}]}
 
 
