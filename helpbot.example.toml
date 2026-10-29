@@ -14,6 +14,9 @@ answer_unanswered_chat_after_minutes = 10   # a chat line that asks something, n
 max_per_hour = 10
 max_per_thread = 3
 poll_seconds = 120
+# ripen_to = 4      # the key's ripening level (UN-RFC 0025); default UNSEENET_RIPEN_TO, else 3.
+                    # 4 takes two to three weeks of one core, then every answer costs about
+                    # a quarter of the postage - worth it for a bot that answers a lot
 learn_from_threads = true                # earlier questions people answered are sources too
 # ignore_keys = ["<key text>"]
 
