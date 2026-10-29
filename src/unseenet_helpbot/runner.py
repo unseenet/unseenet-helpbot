@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from unseenet.client.runtime import SERVICE_RIPEN_TO, ClientRuntime
+from unseenet.client.runtime import ClientRuntime, service_ripen_to
 from unseenet.client.session import Session, SessionError
 from unseenet.core.vault import Vault
 
@@ -78,6 +78,7 @@ class Config:
     news_group: str = ""        # [news] (#13): the feed it tells about releases in; "" is off
     news_gather_hours: float = 2.0
     news_max_tries: int = 3
+    ripen_to: int | None = None  # [bot] ripen_to, else UNSEENET_RIPEN_TO, else 3 (#27)
 
 
 def load_config(path: str | Path) -> Config:
@@ -112,7 +113,8 @@ def load_config(path: str | Path) -> Config:
             learn=bool(b.get("learn_from_threads", True)),
             news_group=str(d.get("news", {}).get("group", "")) if d.get("news", {}).get("enabled") else "",
             news_gather_hours=float(d.get("news", {}).get("gather_hours", 2)),
-            news_max_tries=int(d.get("news", {}).get("max_tries", 3)))
+            news_max_tries=int(d.get("news", {}).get("max_tries", 3)),
+            ripen_to=int(b["ripen_to"]) if "ripen_to" in b else None)
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
 
@@ -354,8 +356,9 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
     try:
         if not dry_run:
             await publish_profile(s)
-            if not once:            # on to level 3, no surcharge; low priority (UN-RFC 0025)
-                ripening = asyncio.create_task(ClientRuntime(s, ripen_to=SERVICE_RIPEN_TO).ripen())
+            if not once:            # to the configured level, low priority (UN-RFC 0025, #27)
+                ripening = asyncio.create_task(
+                    ClientRuntime(s, ripen_to=service_ripen_to(cfg.ripen_to)).ripen())
         while True:
             if datetime.now(timezone.utc) - built > timedelta(hours=1):   # docs may have changed
                 await sync_github(cfg)

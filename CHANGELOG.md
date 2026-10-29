@@ -7,6 +7,14 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+Needs unseenet 0.6 (`unseenet>=0.6,<0.7`): update the nodes first.
+
+- **Ripening to the level you choose** (#27, unseenet#740): the bot's key ripens in the
+  background to `ripen_to` under `[bot]`, else `UNSEENET_RIPEN_TO`, else level 3. Level 4
+  takes two to three weeks of one core, then every answer costs about a quarter of the
+  postage. The project's own bot runs at 4.
 - **News** (#13, `[news]`, off by default): releases told in plain language in
   `unseenet.help.news` - stable ones only, those released together in one post
   ("What's new: Unseenet 0.6.0 and the graphical client 0.3.0"), written by the
@@ -63,7 +71,8 @@ The first release. Works with unseenet 0.4 (`unseenet>=0.4.1,<0.5`).
 - It ripens its key on to level 3 while running, posting through the core's
   `Session` (#6).
 
-[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/unseenet/unseenet-helpbot/releases/tag/v0.1.0
