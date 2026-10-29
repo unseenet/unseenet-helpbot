@@ -42,6 +42,7 @@ NAMES = {"unseenet": "Unseenet", "unseenet-gui": "the graphical client",
          "unseenet-docs": "the docs", "unseenet-mcp": "the MCP server",
          "unseenet-demo": "the demo"}
 _TEST = re.compile(r"(a|b|rc|dev|alpha|beta)\d*$", re.I)
+_VERSION_TAG = re.compile(r"^v\d+(\.\d+)*(\.post\d+)?$")   # not chiavdf-..., web-..., dev
 
 WRITE = """You write one section of the Unseenet help bot's news feed: a few sentences \
 that tell ordinary people what is new in ONE release of one part of Unseenet, a \
@@ -88,7 +89,7 @@ class Release:
 def stable(r: dict) -> bool:
     """A release people should hear about: not a draft, prerelease or test version."""
     tag = str(r.get("tag", ""))
-    return (bool(tag) and not r.get("draft") and not r.get("prerelease") and tag != "dev"
+    return (bool(_VERSION_TAG.match(tag)) and not r.get("draft") and not r.get("prerelease")
             and not _TEST.search(tag.split("+")[0]))
 
 

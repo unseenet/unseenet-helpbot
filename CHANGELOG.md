@@ -7,6 +7,11 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-29
+
+- **Only version tags are news** (#29): a release counts only with a tag like `v0.3.0` or
+  `v0.6.3.post1`, so the entrance's `chiavdf-...` and `web-...` builds are never told about.
+
 ## [0.3.1] - 2026-10-29
 
 - **News that actually gets written** (#29): the 0.6 releases were never posted, because
