@@ -78,6 +78,7 @@ class Config:
     news_group: str = ""        # [news] (#13): the feed it tells about releases in; "" is off
     news_gather_hours: float = 2.0
     news_max_tries: int = 3
+    news_per_look: int = 4      # sections written per look, so answering is not held up long
     ripen_to: int | None = None  # [bot] ripen_to, else UNSEENET_RIPEN_TO, else 3 (#27)
 
 
@@ -114,6 +115,7 @@ def load_config(path: str | Path) -> Config:
             news_group=str(d.get("news", {}).get("group", "")) if d.get("news", {}).get("enabled") else "",
             news_gather_hours=float(d.get("news", {}).get("gather_hours", 2)),
             news_max_tries=int(d.get("news", {}).get("max_tries", 3)),
+            news_per_look=int(d.get("news", {}).get("per_look", 4)),
             ripen_to=int(b["ripen_to"]) if "ripen_to" in b else None)
     except KeyError as exc:
         raise SystemExit(f"{path}: missing {exc}") from exc
@@ -310,7 +312,8 @@ async def news_once(s: Session, cfg: Config, index: Index, news_state, answers, 
     try:
         await news.post_news(s, cfg.news_group, cfg.model, github.load_cache(cfg.github_cache),
                              news_state, gather_hours=cfg.news_gather_hours,
-                             max_tries=cfg.news_max_tries, dry_run=dry_run, log=log)
+                             max_tries=cfg.news_max_tries, per_look=cfg.news_per_look,
+                             dry_run=dry_run, log=log)
     except (SessionError, OSError, ConnectionError) as exc:
         log(f"news: could not post: {exc}")
     await look_once(s, dataclasses.replace(cfg, group=cfg.news_group), index, answers, dry_run, log)
@@ -326,7 +329,8 @@ async def cmd_news(cfg: Config) -> None:
     if st.fresh:
         print("news: first run - every release so far counts as seen; nothing to post")
     out = await news.post_news(None, cfg.news_group, cfg.model, github.load_cache(cfg.github_cache),
-                               st, gather_hours=0, max_tries=cfg.news_max_tries, dry_run=True)
+                               st, gather_hours=0, max_tries=cfg.news_max_tries, per_look=99,
+                               dry_run=True)
     if out is None:
         print("news: nothing to post now")
 

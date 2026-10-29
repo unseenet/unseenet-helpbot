@@ -61,24 +61,76 @@ def test_releases_together_are_one_post_after_the_window(tmp_path):
     assert news.changelog_section(cache(), "unseenet", "0.6.0") == "- **Export** your data."
 
 
-def test_posting_and_not_posting_twice(tmp_path):
+def test_one_section_per_release_put_together_in_one_post(tmp_path):
     st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
     s, m = Session(), Model()
     mid = asyncio.run(news.post_news(s, "unseenet.help.news@x", m, cache(), st, now=T0 + 3 * 3600))
     assert mid == "<n1@x>" and len(s.posts) == 1
     group, subj, body = s.posts[0]
-    assert subj.startswith("What's new: Unseenet 0.6.0") and "export your data" in body
-    assert body.startswith("The official release notes: https://github.com/unseenet/x/releases/v0.6.0")
-    assert "Changelog:" in m.asked[0][1]["content"] and "Notes for v0.3.0" in m.asked[0][1]["content"]
+    assert subj == "What's new: Unseenet 0.6.0 and the graphical client 0.3.0"
+    assert len(m.asked) == 2                                              # one prompt each
+    assert "Notes for v0.6.0" in m.asked[0][1]["content"] and "v0.3.0" not in m.asked[0][1]["content"]
+    assert "Changelog:" in m.asked[0][1]["content"]                      # the notes were short
+    assert "### Unseenet 0.6.0 · #unseenet" in body and "### The graphical client 0.3.0 · #unseenet-gui" in body
+    assert "(https://github.com/unseenet/x/releases/v0.3.0)" in body and "unseenet.announce" in body
+    assert st.written == {} and "unseenet-gui:v0.3.0" in st.seen
     assert asyncio.run(news.post_news(s, "g", m, cache(), st, now=T0 + 9 * 3600)) is None   # done
 
 
-def test_a_failing_model_posts_nothing_and_gives_up(tmp_path):
+def test_a_few_sections_per_look_kept_until_all_are_written(tmp_path):
+    st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
+    s, m = Session(), Model()
+    assert asyncio.run(news.post_news(s, "g", m, cache(), st, now=T0 + 3 * 3600, per_look=1)) is None
+    assert list(news.NewsState.load(tmp_path / "news.json").written) == ["unseenet:v0.6.0"]
+    assert asyncio.run(news.post_news(s, "g", m, cache(), st, now=T0 + 3 * 3600, per_look=1)) == "<n1@x>"
+    assert len(m.asked) == 2 and len(s.posts) == 1
+
+
+class Failing(Model):
+    """Fails on the gui release, writes the others."""
+    async def complete(self, messages, *a, **kw):
+        self.asked.append(messages)
+        if "graphical client" in messages[1]["content"]:
+            raise TimeoutError("timed out")
+        return self.text
+
+
+def test_a_release_the_model_fails_on_is_left_out_never_raw_notes(tmp_path):
+    st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
+    s, logs = Session(), []
+    for _ in range(3):
+        asyncio.run(news.post_news(s, "g", Failing(), cache(), st, now=T0 + 3 * 3600, log=logs.append))
+    assert len(s.posts) == 1
+    _, subj, body = s.posts[0]
+    assert subj == "What's new: Unseenet 0.6.0" and "graphical client" not in body
+    assert "Notes for" not in body                                        # no raw notes
+    assert any("TimeoutError" in x for x in logs) and any("gave up on unseenet-gui:v0.3.0" in x for x in logs)
+
+
+def test_nothing_to_say_posts_nothing(tmp_path):
     st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
     s = Session()
-    for _ in range(3):
-        assert asyncio.run(news.post_news(s, "g", Model("DONT_KNOW"), cache(), st, now=T0 + 3 * 3600)) is None
-    assert s.posts == [] and st.tries["unseenet:v0.6.0"] == 3
-    assert news.due(cache(), st, now=T0 + 3 * 3600) == []                 # given up
-    st2 = news.NewsState(tmp_path / "n2.json", seen={"unseenet:v0.5.0"}, fresh=False)
-    assert asyncio.run(news.post_news(s, "g", Model(OSError("down")), cache(), st2, now=T0 + 3 * 3600)) is None
+    assert asyncio.run(news.post_news(s, "g", Model("DONT_KNOW"), cache(), st, now=T0 + 3 * 3600)) is None
+    assert s.posts == [] and "unseenet:v0.6.0" in st.seen
+
+
+class Refusing(Session):
+    async def post(self, group, subject, body):
+        if subject.startswith("What's new"):
+            raise ValueError("too big")
+        return await super().post(group, subject, body)
+
+
+def test_if_the_gathered_post_fails_each_release_gets_its_own(tmp_path):
+    st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
+    s = Refusing()
+    asyncio.run(news.post_news(s, "g", Model(), cache(), st, now=T0 + 3 * 3600))
+    assert [p[1] for p in s.posts] == ["[unseenet] What's new: Unseenet 0.6.0",
+                                       "[unseenet-gui] What's new: the graphical client 0.3.0"]
+    assert "#unseenet-gui" in s.posts[1][2] and "Notes for" not in s.posts[1][2]
+
+
+def test_many_releases_make_a_short_subject():
+    rels = [news.Release(n, "v1.0.0", "", "", "", "") for n in
+            ("unseenet-gui", "unseenet-tui", "unseenet", "unseenet-gateway", "unseenet-watchman")]
+    assert news.subject(rels) == "What's new: Unseenet 1.0.0, the graphical client 1.0.0 and 3 more"
