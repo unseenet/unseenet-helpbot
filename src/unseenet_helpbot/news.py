@@ -16,6 +16,10 @@ its answers (only what the sources say, no dates, no security advice).
   there. The bot puts them together itself, each under its own heading tagged with the
   repository (``#unseenet-gui``).
 - If that post cannot be posted, each release gets its own post instead, tagged the same way.
+- A post carries one link card (UN-RFC 0059), made over Tor where the core makes cards:
+  for the lead release of the round - the core's when it is in it, else the first - while
+  the others keep their plain link under their own section. A post for one release gets
+  the card for its own release page. No card when the page cannot be had; the post goes.
 - Raw release notes are never posted: they are in ``unseenet.announce``. A release the
   model fails on ``max_tries`` times is left out (and logged); one it has nothing to say
   about (DONT_KNOW) is left out too.
@@ -233,6 +237,38 @@ def single_subject(r: Release) -> str:
     return f"[{r.repo}] What's new: {NAMES.get(r.repo, r.repo)} {r.version}"[:200]
 
 
+def lead(rels: list[Release]) -> Release:
+    """The release a round's link card is for: the core's when it is in it, else the first."""
+    return next((r for r in rels if r.repo == "unseenet"), rels[0])
+
+
+async def card_for(session, url: str, log=print):
+    """A link card for a release page (UN-RFC 0059), or None: the core does not make cards,
+    they are turned off, or the page gives no title."""
+    make = getattr(session, "make_card", None)
+    if make is None or not url:
+        return None
+    if hasattr(session, "link_cards") and not session.link_cards():
+        return None
+    try:
+        draft = await make(url)
+    except Exception as exc:                          # no Tor, no page: no card
+        log(f"news: no link card for {url}: {exc}")
+        return None
+    return draft if draft.title.strip() else None
+
+
+async def _post(session, group: str, subj: str, text: str, card, log=print):
+    """Post with the card; if that is refused, once more without it."""
+    if card is None:
+        return await session.post(group, subj, text)
+    try:
+        return await session.post(group, subj, text, card=card)
+    except Exception as exc:
+        log(f"news: not posted with its link card ({exc}); trying without")
+        return await session.post(group, subj, text)
+
+
 async def post_news(session, group: str, model, cache: dict, state: NewsState, *,
                     gather_hours: float = 2.0, max_tries: int = 3, dry_run: bool = False,
                     log=print, now: float | None = None, per_look: int = 4) -> str | None:
@@ -267,18 +303,22 @@ async def post_news(session, group: str, model, cache: dict, state: NewsState, *
         log("news: nothing to tell about " + ", ".join(r.key for r in batch))
         return None
     text = body(ready)
+    first = lead([r for r, _ in ready])
     if dry_run:
-        log(f"news: would post {subject([r for r, _ in ready])!r}:\n{text}")
+        log(f"news: would post {subject([r for r, _ in ready])!r} with a link card for "
+            f"{first.url}:\n{text}")
         return text
     try:
-        msgid = await session.post(group, subject([r for r, _ in ready]), text)
+        card = await card_for(session, first.url, log)
+        msgid = await _post(session, group, subject([r for r, _ in ready]), text, card, log)
         log(f"news: posted {msgid}: {subject([r for r, _ in ready])}")
     except Exception as exc:                          # too big, refused: one post each
         log(f"news: the gathered post failed ({exc}); posting each release on its own")
         msgid = None
         for r, t in ready:
             one = (f"{t}\n\n[Release notes and downloads]({r.url}) · {tag(r.repo)}\n")
-            mid = await session.post(group, single_subject(r), one)
+            mid = await _post(session, group, single_subject(r), one,
+                              await card_for(session, r.url, log), log)
             msgid = msgid or mid
             log(f"news: posted {mid}: {single_subject(r)}")
     _done(state, batch, msgid)
