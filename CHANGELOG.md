@@ -7,6 +7,10 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-30
+
+Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
+
 - **A link card on the news** (UN-RFC 0059): each post in `unseenet.help.news` carries one
   link card, made over Tor - for a round of releases the core's release page (or the
   first release's when the core is not in it), the others keeping their plain link under
@@ -94,7 +98,8 @@ The first release. Works with unseenet 0.4 (`unseenet>=0.4.1,<0.5`).
 - It ripens its key on to level 3 while running, posting through the core's
   `Session` (#6).
 
-[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.1.0...v0.2.0
