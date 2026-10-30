@@ -7,6 +7,12 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+- **A link card on the news** (UN-RFC 0059): each post in `unseenet.help.news` carries one
+  link card, made over Tor - for a round of releases the core's release page (or the
+  first release's when the core is not in it), the others keeping their plain link under
+  their own section; a post for one release the card of its own page. No card when the
+  core makes none or the page cannot be had; the post goes all the same.
+
 ## [0.3.2] - 2026-10-29
 
 - **Only version tags are news** (#29): a release counts only with a tag like `v0.3.0` or

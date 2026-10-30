@@ -135,3 +135,65 @@ def test_many_releases_make_a_short_subject():
     rels = [news.Release(n, "v1.0.0", "", "", "", "") for n in
             ("unseenet-gui", "unseenet-tui", "unseenet", "unseenet-gateway", "unseenet-watchman")]
     assert news.subject(rels) == "What's new: Unseenet 1.0.0, the graphical client 1.0.0 and 3 more"
+
+
+class CardSession(Session):
+    """A session whose core makes link cards (UN-RFC 0059)."""
+
+    def __init__(self, on=True, refuse_cards=False):
+        super().__init__()
+        self.on, self.refuse_cards, self.made, self.cards = on, refuse_cards, [], []
+
+    def link_cards(self):
+        return self.on
+
+    async def make_card(self, url):
+        from types import SimpleNamespace
+        self.made.append(url)
+        return SimpleNamespace(url=url, title="" if "nothing" in url else f"Release · {url}")
+
+    async def post(self, group, subject, body, card=None):
+        if card is not None and self.refuse_cards:
+            raise ValueError("the card's link is not in the text")
+        self.cards.append(card.url if card else None)
+        return await super().post(group, subject, body)
+
+
+def test_a_round_gets_one_card_for_the_cores_release(tmp_path):
+    st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
+    s = CardSession()
+    asyncio.run(news.post_news(s, "g", Model(), cache(), st, now=T0 + 3 * 3600))
+    assert s.made == ["https://github.com/unseenet/x/releases/v0.6.0"]       # the core's
+    assert s.cards == ["https://github.com/unseenet/x/releases/v0.6.0"]
+    assert "(https://github.com/unseenet/x/releases/v0.3.0)" in s.posts[0][2]  # the rest: links
+
+
+def test_the_lead_is_the_first_without_the_core():
+    rels = [news.Release("unseenet-gui", "v1.0.0", "", "", "", "a"),
+            news.Release("unseenet-tui", "v1.0.0", "", "", "", "b")]
+    assert news.lead(rels).url == "a"
+    assert news.lead(rels + [news.Release("unseenet", "v1.0.0", "", "", "", "c")]).url == "c"
+
+
+def test_no_card_when_off_untitled_or_refused(tmp_path):
+    for s in (CardSession(on=False), CardSession(refuse_cards=True)):
+        st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
+        asyncio.run(news.post_news(s, "g", Model(), cache(), st, now=T0 + 3 * 3600))
+        assert len(s.posts) == 1 and s.cards == [None]                     # posted all the same
+    assert asyncio.run(news.card_for(CardSession(), "https://x/nothing")) is None
+    assert asyncio.run(news.card_for(Session(), "https://x/a")) is None     # a core without cards
+
+
+class RefusingCards(CardSession):
+    async def post(self, group, subject, body, card=None):
+        if subject.startswith("What's new"):
+            raise ValueError("too big")
+        return await super().post(group, subject, body, card)
+
+
+def test_each_release_on_its_own_gets_its_own_card(tmp_path):
+    st = news.NewsState(tmp_path / "news.json", seen={"unseenet:v0.5.0"}, fresh=False)
+    s = RefusingCards()
+    asyncio.run(news.post_news(s, "g", Model(), cache(), st, now=T0 + 3 * 3600))
+    assert s.cards == ["https://github.com/unseenet/x/releases/v0.6.0",
+                       "https://github.com/unseenet/x/releases/v0.3.0"]
