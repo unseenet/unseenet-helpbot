@@ -1,0 +1,44 @@
+# unseenet-helpbot with Docker Compose, and Ollama beside it (README: "In Docker").
+#
+#   echo 'a long passphrase' > vault-passphrase.txt && chmod 600 vault-passphrase.txt
+#   docker compose up -d ollama
+#   docker compose exec ollama ollama pull qwen2.5:7b     # ~5 GB, once
+#   docker compose run --rm helpbot           # first time: writes /data/helpbot.toml
+#   docker compose run --rm helpbot sh -c 'vi /data/helpbot.toml'   # set the group
+#   docker compose run --rm helpbot init      # the vault and the bot's key
+#   docker compose up -d
+#
+# The model answers inside this project; questions never leave it. The bot reads
+# GitHub directly (public repositories) and the network over Tor.
+services:
+  helpbot:
+    image: ghcr.io/unseenet/helpbot:latest
+    restart: unless-stopped
+    depends_on: [ollama]
+    environment:
+      HELPBOT_MODEL_URL: http://ollama:11434/v1      # only for a new helpbot.toml
+      # HELPBOT_GITHUB_TOKEN: ...                    # read-only token, with token_env in [github]
+    volumes:
+      - helpbot:/data              # helpbot.toml, the vault, the GitHub cache, state
+    secrets:
+      - unseenet_vault_passphrase
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE]
+    security_opt: [no-new-privileges:true]
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama       # the models
+    # No ports: only the bot uses it. A GPU? See Ollama's Docker instructions.
+
+volumes:
+  helpbot:
+  ollama:
+
+secrets:
+  unseenet_vault_passphrase:
+    file: ./vault-passphrase.txt

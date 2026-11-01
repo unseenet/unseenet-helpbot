@@ -7,6 +7,13 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **A container image**, `ghcr.io/unseenet/helpbot` (unseenet#862): the bot on the node
+  image, amd64 and arm64, signed, published for releases. `compose.yaml` runs it with an
+  Ollama container beside it, so questions never leave the project; the vault's
+  passphrase is a Docker secret. README: "In Docker".
+
 ## [0.4.0] - 2026-10-30
 
 Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
