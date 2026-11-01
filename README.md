@@ -77,6 +77,32 @@ sudo GROUP="unseenet.help@<fp>" bash contrib/install-ubuntu.sh
 The bot publishes a profile with the bot mark (UN-RFC 0022) on its first
 run, and does not answer keys whose profile carries the mark.
 
+### In Docker
+
+`ghcr.io/unseenet/helpbot` has the bot, the core and Tor, for amd64 and arm64,
+published for releases only and signed with cosign. The vault, `helpbot.toml`,
+the GitHub cache and the state are in the volume at `/data`; the vault's
+passphrase comes from a Docker secret (`unseenet_vault_passphrase`),
+`UNSEENET_VAULT_PASSPHRASE_FILE` or `UNSEENET_VAULT_PASSPHRASE`. The model runs
+beside it: [`compose.yaml`](compose.yaml) starts an Ollama container too, so
+questions never leave the project.
+
+```sh
+echo 'a long passphrase' > vault-passphrase.txt && chmod 600 vault-passphrase.txt
+docker compose up -d ollama
+docker compose exec ollama ollama pull qwen2.5:7b
+docker compose run --rm helpbot              # writes an example /data/helpbot.toml
+docker compose run --rm helpbot sh -c 'vi /data/helpbot.toml'    # set the group
+docker compose run --rm helpbot init         # the vault and the bot's key
+docker compose up -d
+```
+
+`HELPBOT_MODEL_URL` sets the model's address in a new `helpbot.toml` (default
+`http://ollama:11434/v1`); point it at another Ollama, such as one on its own
+machine, if you have one. The bot does not update itself in its container:
+`docker compose pull && docker compose up -d`. Back up the `helpbot` volume;
+the model can always be pulled again.
+
 ### Choosing a model
 
 Tried on an 8-core laptop CPU without a GPU, with the same three questions:
