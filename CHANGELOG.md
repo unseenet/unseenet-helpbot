@@ -14,6 +14,10 @@ All notable changes to unseenet-helpbot are listed here. The format follows
   Ollama container beside it, so questions never leave the project; the vault's
   passphrase is a Docker secret. README: "In Docker".
 
+### Changed
+
+- Runs on core 0.7 (`unseenet>=0.7,<0.8`): announced nodes, councils and servers that update themselves.
+
 ## [0.4.0] - 2026-10-30
 
 Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
