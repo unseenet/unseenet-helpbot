@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import dataclasses
 import os
 import sys
@@ -156,6 +157,37 @@ def build_index(cfg: Config) -> Index:
     if cfg.github is not None:
         chunks += github.chunks(github.load_cache(cfg.github_cache), cfg.github.org)
     return Index(chunks)
+
+
+BUSY_EVERY = 600     # seconds: the updater takes a busy file older than 6 hours as left over
+
+
+@contextlib.asynccontextmanager
+async def busy(path: Path):
+    """While the key ripens, a file that tells the updater not to restart the bot now
+    (unseenet-service-update --busy, unseenet/unseenet#827): a restart would start the
+    segment being proved over."""
+    async def keep() -> None:
+        while True:
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.touch()
+            except OSError:
+                pass
+            await asyncio.sleep(BUSY_EVERY)
+    task = asyncio.create_task(keep())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(OSError):
+            path.unlink()
+
+
+async def ripen(s, cfg: "Config") -> None:
+    """The bot's key, on to its level in the background (UN-RFC 0025, #27)."""
+    async with busy(cfg.state_file.with_name("busy")):
+        await ClientRuntime(s, ripen_to=service_ripen_to(cfg.ripen_to)).ripen()
 
 
 async def sync_github(cfg: Config, force: bool = False, log=print) -> bool:
@@ -361,8 +393,7 @@ async def cmd_run(cfg: Config, once: bool, dry_run: bool) -> None:
         if not dry_run:
             await publish_profile(s)
             if not once:            # to the configured level, low priority (UN-RFC 0025, #27)
-                ripening = asyncio.create_task(
-                    ClientRuntime(s, ripen_to=service_ripen_to(cfg.ripen_to)).ripen())
+                ripening = asyncio.create_task(ripen(s, cfg))
         while True:
             if datetime.now(timezone.utc) - built > timedelta(hours=1):   # docs may have changed
                 await sync_github(cfg)

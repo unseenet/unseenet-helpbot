@@ -74,6 +74,12 @@ as a systemd service:
 sudo GROUP="unseenet.help@<fp>" bash contrib/install-ubuntu.sh
 ```
 
+It also keeps the bot up to date by itself (unseenet/unseenet#827): from the
+newest release the project key signed, checked against its hashes, never an
+older one, back to the one before if it does not come up, and never while the
+key ripens. `SELF_UPDATE=off` turns that off (and `on` back on). It needs a core with
+`unseenet-service-update --package` (0.8 or newer).
+
 The bot publishes a profile with the bot mark (UN-RFC 0022) on its first
 run, and does not answer keys whose profile carries the mark.
 

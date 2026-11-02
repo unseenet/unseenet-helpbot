@@ -7,6 +7,15 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **The help bot can update itself** (unseenet/unseenet#827, UN-RFC 0062 section 6.1): each
+  release carries its server requirements (naming the bot by its wheel in the release, as it is
+  not on PyPI) and `SHA256SUMS.txt`, and `contrib/install-ubuntu.sh` sets up a timer that
+  updates to the newest release the project key signed (with a core that has
+  `unseenet-service-update --package`, 0.8 or newer; `SELF_UPDATE=off` turns it off). While
+  the key ripens the bot keeps a `busy` file beside its state, and the update waits.
+
 ## [0.5.0] - 2026-11-02
 
 A container image with Ollama beside it, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
