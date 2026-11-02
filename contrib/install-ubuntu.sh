@@ -9,12 +9,18 @@
 # service. The bot reads the docs, issues and pull requests of every public
 # repository of the organisation from GitHub itself, every 6 hours.
 # Running it again updates the bot and keeps the vault, key and state.
+#
+# The bot then updates itself from its newest signed release (unseenet/unseenet#827),
+# a random time of up to 48 hours after it is out, and goes back if it does not
+# come up. SELF_UPDATE=off turns that off, SELF_UPDATE=on back on; without it, a
+# machine keeps what it had (on, when new).
 set -euo pipefail
 
 GROUP="${GROUP:?set GROUP to the ID of the help group}"
 MODEL="${MODEL:-qwen2.5:7b}"
 REPO="${REPO:-https://github.com/unseenet/unseenet-helpbot.git}"
 HOME_DIR=/home/helpbot
+SELF_UPDATE="${SELF_UPDATE:-}"        # on, off, or empty: as before (on when new)
 ENV_FILE=/etc/unseenet-helpbot/env
 
 apt-get update -qq
@@ -92,9 +98,46 @@ RestartSec=60
 WantedBy=multi-user.target
 EOF
 
+# Updating by itself (unseenet/unseenet#827): from the newest release the project key
+# signed, never to an older one, and back if it does not come up. Not while the key
+# ripens (the busy file). Needs a core with --package (0.8 or newer) in the venv.
+UPDATER=$HOME_DIR/.venv/bin/unseenet-service-update
+if "$UPDATER" --help 2>/dev/null | grep -q -- --package; then
+  cat > /etc/systemd/system/unseenet-helpbot-update.service <<EOF
+[Unit]
+Description=Update unseenet-helpbot from its newest signed release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$UPDATER run --service unseenet-helpbot --package unseenet-helpbot --busy $HOME_DIR/.local/state/unseenet-helpbot/busy
+EOF
+  cat > /etc/systemd/system/unseenet-helpbot-update.timer <<EOF
+[Unit]
+Description=Look for a new release of unseenet-helpbot four times a day
+
+[Timer]
+OnCalendar=*-*-* 00/6:00:00
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+  case "$SELF_UPDATE" in
+    on|off) "$UPDATER" "$SELF_UPDATE" --service unseenet-helpbot >/dev/null ;;
+  esac
+  UPDATE_TIMER=yes
+fi
+
 systemctl daemon-reload
 systemctl enable unseenet-helpbot
 systemctl restart unseenet-helpbot
+if [ -n "${UPDATE_TIMER:-}" ]; then
+  systemctl enable -q --now unseenet-helpbot-update.timer
+  echo "Updating by itself: $UPDATER status --service unseenet-helpbot"
+fi
 echo
 echo "The help bot runs. Logs: journalctl -u unseenet-helpbot -f"
 echo "Back up: $HOME_DIR/.config/unseenet-helpbot/ (vault, config) and $ENV_FILE (passphrase)"
