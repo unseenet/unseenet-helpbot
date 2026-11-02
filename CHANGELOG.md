@@ -7,6 +7,10 @@ All notable changes to unseenet-helpbot are listed here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-02
+
+A container image with Ollama beside it, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
+
 ### Added
 
 - **A container image**, `ghcr.io/unseenet/helpbot` (unseenet#862): the bot on the node
@@ -109,7 +113,8 @@ The first release. Works with unseenet 0.4 (`unseenet>=0.4.1,<0.5`).
 - It ripens its key on to level 3 while running, posting through the core's
   `Session` (#6).
 
-[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-helpbot/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.1...v0.3.0
 [0.2.1]: https://github.com/unseenet/unseenet-helpbot/compare/v0.2.0...v0.2.1
