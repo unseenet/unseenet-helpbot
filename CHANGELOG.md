@@ -16,6 +16,14 @@ All notable changes to unseenet-helpbot are listed here. The format follows
   `unseenet-service-update --package`, 0.8 or newer; `SELF_UPDATE=off` turns it off). While
   the key ripens the bot keeps a `busy` file beside its state, and the update waits.
 
+### Fixed
+
+- **Answers about now come from how it is now.** "How do I find the latest version?" was
+  answered from 0.3.1's CHANGELOG section (GitHub `releases/latest`) instead of the page on
+  updating. A changelog now counts as history, and only its three newest releases are read;
+  and a few words are read as the same on both sides, so a question and a page meet:
+  latest/newest, upgrade/update.
+
 ## [0.5.0] - 2026-11-02
 
 A container image with Ollama beside it, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.

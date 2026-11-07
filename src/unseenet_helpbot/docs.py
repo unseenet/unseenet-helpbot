@@ -46,8 +46,8 @@ class Chunk:
         earlier answers in the help group), ``guide`` (the walkthrough), ``spec`` (the
         UN-RFCs: how it is meant to work), ``history`` (issues and pull requests) or
         ``docs`` (the rest)."""
-        if self.kind == "issue":
-            return "history"
+        if self.kind == "issue" or self.path.lower().rsplit("/", 1)[-1] in CHANGELOGS:
+            return "history"           # what was true then, not how it is now
         if self.kind == "thread":
             return "howto"
         p = self.path.lower()
@@ -72,11 +72,18 @@ class Chunk:
         return f"{doc}, {self.heading}" if self.heading and self.heading != self.title else doc
 
 
+# Words people ask with that the docs say differently: both sides are read as the
+# same word, so "the latest version" finds a page about "the newest version".
+SYNONYMS = {"latest": "newest", "upgrade": "update", "upgrades": "updates",
+            "upgrading": "updating", "upgraded": "updated"}
+
+
 def tokens(text: str) -> list[str]:
     out = []
     for w in _WORD.findall(text.lower()):
         if w in STOP or len(w) < 2:
             continue
+        w = SYNONYMS.get(w, w)
         out.append(w)
         if "-" in w or "." in w or "_" in w:      # un-rfc-0019 also matches 0019
             out.extend(p for p in re.split(r"[-_.]", w) if len(p) > 1 and p not in STOP)
@@ -129,7 +136,9 @@ def chunk_text(text: str, rel: str, url: str, repo: str = "") -> list[Chunk]:
             sections.append((m.group(2), [ln]))
         else:
             sections[-1][1].append(ln)
-    if len(text) <= WHOLE:
+    if rel.rsplit("/", 1)[-1].lower() in CHANGELOGS:
+        sections = _newest_releases(sections)
+    elif len(text) <= WHOLE:
         sections = [("", lines)]
     out = []
     for heading, body in sections:
@@ -140,6 +149,25 @@ def chunk_text(text: str, rel: str, url: str, repo: str = "") -> list[Chunk]:
             c = Chunk(rel, title, heading, piece, url, repo=repo)
             c.terms = Counter(tokens(f"{repo} {title} {heading} {heading} {piece}"))
             out.append(c)
+    return out
+
+
+CHANGELOGS = {"changelog.md"}
+CHANGELOG_KEEP = 3        # releases of a changelog kept; older ones describe a state long gone
+_RELEASE = re.compile(r"^\[?v?\d+\.\d+")
+
+
+def _newest_releases(sections: list[tuple[str, list[str]]]) -> list[tuple[str, list[str]]]:
+    """A changelog's sections without the older releases: what is unreleased, and
+    the ``CHANGELOG_KEEP`` newest. Old sections answered questions about now with how
+    things were then (an answer on updating from 0.3.1's notes)."""
+    out, releases = [], 0
+    for heading, body in sections:
+        if _RELEASE.match(heading):
+            releases += 1
+            if releases > CHANGELOG_KEEP:
+                continue
+        out.append((heading, body))
     return out
 
 

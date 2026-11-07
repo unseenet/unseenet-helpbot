@@ -43,3 +43,39 @@ def test_the_model_is_told():
     text = excerpts(GUI + RFC)
     assert "[1] (how-to)" in text and "[2] (spec)" in text
     assert "graphical client" in SYSTEM and "Ctrl+P" in SYSTEM and "spec" in SYSTEM
+
+
+# The help bot answered "How do I find the latest version?" from 0.3.1's CHANGELOG
+# section ("releases/latest" on GitHub) instead of the page on updating.
+UPDATING = chunk("updating.md", "# Updating\n\n## Portable (Linux, macOS, Windows) · Graphical\n\n"
+                 "Press Update in the window: it fetches the newest version, checks its "
+                 "signature and puts it in place. The version you run is in About Unseenet.",
+                 repo="unseenet-portable")
+LOG = "# Changelog\n\n## [Unreleased]\n\nNothing yet, nothing at all here.\n\n" + "".join(
+    f"## [0.{n}.0] - 2026-10-{n + 10}\n\nRelease {n}: things that changed in version 0.{n}.0.\n\n"
+    for n in range(7, 3, -1)) + (
+    "## [0.3.1] - 2026-10-18\n\nA stable release is now GitHub's latest release, so "
+    "releases/latest finds the latest version; before, the latest was a pre-release.\n")
+CHANGELOG = chunk("CHANGELOG.md", LOG)
+
+
+def test_a_changelog_keeps_only_its_newest_releases():
+    headings = [c.heading for c in CHANGELOG]
+    assert headings[0] == "[Unreleased]"
+    assert [h for h in headings if h.startswith("[0")] == [
+        "[0.7.0] - 2026-10-17", "[0.6.0] - 2026-10-16", "[0.5.0] - 2026-10-15"]
+    assert not any("0.3.1" in c.text for c in CHANGELOG)
+    assert all(c.role == "history" for c in CHANGELOG)
+
+
+def test_latest_finds_the_newest():
+    old = chunk_text("## [0.3.1]\n\n" + "the latest release, releases/latest, latest " * 3,
+                     "notes.md", "https://example.org/notes.md")
+    hits = [c for _, c in Index(UPDATING + old + CHANGELOG).search(
+        "How do I find the latest version ?")]
+    assert hits[0].path == "updating.md"
+
+
+def test_upgrade_is_update():
+    from unseenet_helpbot.docs import tokens
+    assert tokens("how do I upgrade") == tokens("how do I update")
